@@ -1,0 +1,573 @@
+/* Elegant Minimalist Heritage Theme - Chakaram (Chowka Bara) 3D */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+Tamil:wght@400;600;700&display=swap');
+
+:root {
+    --gold-primary: #cba258;
+    --gold-bright: #eec66d;
+    --wood-warm: #32251c;
+    --panel-bg: rgba(30, 24, 20, 0.92);
+    --panel-border: rgba(203, 162, 88, 0.35);
+    --text-main: #fcf9f2;
+    --text-dim: #bdae9c;
+    --bg-studio: #d2cbc1;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg-studio);
+    color: var(--text-main);
+    font-family: 'Noto Sans Tamil', 'Cinzel', -apple-system, sans-serif;
+}
+
+#webgl-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+/* UI Overlay Layer */
+.ui-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 1rem;
+}
+
+/* Minimalist Top Bar */
+.top-bar {
+    pointer-events: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel-bg);
+    padding: 0.5rem 1.1rem;
+    border-radius: 8px;
+    border: 1px solid var(--panel-border);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.brand-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--gold-bright);
+    letter-spacing: 0.8px;
+}
+
+.badge-mode {
+    background: rgba(203, 162, 88, 0.18);
+    border: 1px solid rgba(238, 198, 109, 0.4);
+    padding: 0.15rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    color: var(--gold-bright);
+}
+
+.top-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-header {
+    background: rgba(45, 36, 30, 0.85);
+    border: 1px solid var(--panel-border);
+    color: var(--text-main);
+    padding: 0.38rem 0.8rem;
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.btn-header:hover {
+    border-color: var(--gold-bright);
+    color: var(--gold-bright);
+    transform: translateY(-1px);
+}
+
+.btn-quit {
+    background: rgba(80, 25, 20, 0.85);
+    border-color: rgba(200, 60, 50, 0.4);
+}
+
+.btn-quit:hover {
+    background: rgba(110, 30, 24, 0.95);
+    border-color: #ff6655;
+    color: #ffffff;
+}
+
+/* ==============================================================
+   CLEAN MINIMALIST PLAYER DISPLAY (NO CLUMSY EMOJI PILLS)
+   ============================================================== */
+
+.player-corner {
+    position: absolute;
+    pointer-events: auto;
+    z-index: 15;
+    transition: all 0.25s ease;
+}
+
+/* South (P1 - You) - Bottom */
+.corner-south {
+    bottom: 1.2rem;
+    left: 2rem;
+}
+
+/* West (P2) - Left */
+.corner-west {
+    left: 1.2rem;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* North (P3) - Top */
+.corner-north {
+    top: 4.5rem;
+    left: 2rem;
+}
+
+/* East (P4) - Right */
+.corner-east {
+    right: 1.2rem;
+    top: 30%;
+    transform: translateY(-50%);
+}
+
+.player-card-clean {
+    background: var(--panel-bg);
+    border: 1.5px solid rgba(203, 162, 88, 0.22);
+    border-radius: 12px;
+    padding: 0.45rem 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(8px);
+    transition: all 0.25s ease;
+}
+
+.player-card-clean.active-turn {
+    border-color: var(--gold-bright);
+    background: linear-gradient(145deg, rgba(52, 42, 34, 0.98), rgba(28, 22, 17, 0.98));
+    box-shadow: 0 0 18px rgba(238, 198, 109, 0.6);
+    transform: scale(1.06);
+}
+
+.card-avatar {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px currentColor;
+}
+
+.card-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.card-name {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-main);
+    white-space: nowrap;
+}
+
+.player-card-clean.active-turn .card-name {
+    color: var(--gold-bright);
+}
+
+.card-sub {
+    font-size: 0.68rem;
+    color: var(--text-dim);
+}
+
+.card-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold-bright);
+    opacity: 0;
+    margin-left: 0.2rem;
+}
+
+.player-card-clean.active-turn .card-status-dot {
+    opacity: 1;
+    animation: pulseDot 1.2s infinite;
+}
+
+@keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.4; }
+}
+
+/* ==============================================================
+   SIDE CHOZHI ROLL DOCK (RIGHT SIDE OF THE BOARD IN PLAIN SIGHT)
+   ============================================================== */
+
+.side-chozhi-dock {
+    position: absolute;
+    right: 2rem;
+    bottom: 2rem;
+    pointer-events: auto;
+    background: var(--panel-bg);
+    border: 1.5px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 0.85rem 1.2rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
+    z-index: 20;
+    min-width: 180px;
+    text-align: center;
+}
+
+.chozhi-dock-title {
+    font-size: 0.72rem;
+    color: var(--gold-bright);
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+
+.side-shells-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 1.15rem;
+}
+
+.shell-icon.shell-open {
+    filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.8));
+}
+
+.shell-icon.shell-closed {
+    opacity: 0.45;
+}
+
+.side-score-box {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: var(--gold-bright);
+    text-shadow: 0 0 10px rgba(238, 198, 109, 0.6);
+    line-height: 1.2;
+}
+
+.btn-roll-side {
+    width: 100%;
+    padding: 0.55rem 1rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    font-family: inherit;
+    background: linear-gradient(135deg, #a8421c, #6e240a);
+    border: 1.5px solid var(--gold-bright);
+    color: #ffffff;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 3px 12px rgba(168, 66, 28, 0.45);
+    transition: all 0.2s ease;
+}
+
+.btn-roll-side:hover:not(:disabled) {
+    background: linear-gradient(135deg, #c45224, #872e0e);
+    box-shadow: 0 0 16px rgba(255, 140, 43, 0.8);
+    transform: translateY(-1px);
+}
+
+.btn-roll-side:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: #2b231c !important;
+    border-color: #4a3b2c !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+/* Subtle Hint Toast */
+.hint-toast {
+    position: absolute;
+    top: 5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30, 24, 20, 0.94);
+    border: 1px solid rgba(238, 198, 109, 0.5);
+    border-radius: 14px;
+    padding: 0.35rem 1.2rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--gold-bright);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    z-index: 25;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.hint-toast.visible {
+    opacity: 1;
+}
+
+/* ==============================================================
+   HOME PAGE / SETUP WIZARD MODAL
+   ============================================================== */
+
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(14, 11, 9, 0.88);
+    backdrop-filter: blur(10px);
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.modal-backdrop.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.home-card {
+    width: 90%;
+    max-width: 520px;
+    background: linear-gradient(180deg, #241d18 0%, #17120e 100%);
+    border: 1.5px solid var(--gold-bright);
+    border-radius: 14px;
+    padding: 1.8rem;
+    box-shadow: 0 16px 44px rgba(0, 0, 0, 0.7), 0 0 28px rgba(238, 198, 109, 0.25);
+    text-align: center;
+}
+
+.home-card h2 {
+    font-size: 1.6rem;
+    color: var(--gold-bright);
+    margin-bottom: 0.25rem;
+}
+
+.home-subtitle {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    margin-bottom: 1.3rem;
+}
+
+.menu-options-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    margin-bottom: 1rem;
+}
+
+.menu-btn-choice {
+    background: rgba(45, 36, 30, 0.7);
+    border: 1.5px solid rgba(203, 162, 88, 0.3);
+    border-radius: 10px;
+    padding: 0.85rem 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    color: var(--text-main);
+}
+
+.menu-btn-choice:hover {
+    border-color: var(--gold-bright);
+    background: rgba(65, 52, 42, 0.85);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(238, 198, 109, 0.25);
+}
+
+.menu-btn-choice .choice-icon {
+    font-size: 1.6rem;
+}
+
+.menu-btn-choice .choice-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--gold-bright);
+    margin-bottom: 0.15rem;
+}
+
+.menu-btn-choice .choice-desc {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+
+/* Step 2 Config View */
+.step2-view {
+    display: none;
+    text-align: left;
+}
+
+.step2-view.active {
+    display: block;
+}
+
+.step2-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.1rem;
+}
+
+.btn-back-step {
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--gold-bright);
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.section-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--gold-bright);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 0.4rem;
+}
+
+.row-buttons {
+    display: flex;
+    gap: 0.45rem;
+    margin-bottom: 1.1rem;
+}
+
+.btn-pill-opt {
+    flex: 1;
+    padding: 0.55rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    font-family: inherit;
+    border-radius: 8px;
+    background: rgba(45, 36, 30, 0.6);
+    border: 1.5px solid rgba(203, 162, 88, 0.25);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.btn-pill-opt:hover {
+    border-color: var(--gold-bright);
+}
+
+.btn-pill-opt.selected {
+    background: linear-gradient(145deg, #a8421c, #5a2608);
+    border-color: var(--gold-bright);
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(255, 140, 43, 0.45);
+}
+
+.room-code-box {
+    background: rgba(0, 0, 0, 0.45);
+    border: 1.5px dashed var(--gold-bright);
+    border-radius: 8px;
+    padding: 0.8rem;
+    text-align: center;
+    margin-bottom: 1.1rem;
+}
+
+.room-code-text {
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 3px;
+    color: var(--gold-bright);
+}
+
+.btn-start-final {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: inherit;
+    background: linear-gradient(135deg, #a8421c, #6e240a);
+    border: 1.5px solid var(--gold-bright);
+    color: #ffffff;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(168, 66, 28, 0.5);
+    transition: all 0.2s ease;
+}
+
+.btn-start-final:hover {
+    background: linear-gradient(135deg, #c45224, #872e0e);
+    transform: translateY(-1px);
+}
+
+/* Settings Modal */
+.settings-card {
+    width: 85%;
+    max-width: 420px;
+    background: #1e1814;
+    border: 1.5px solid var(--gold-bright);
+    border-radius: 12px;
+    padding: 1.6rem;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75);
+    text-align: left;
+}
+
+.settings-card h3 {
+    font-size: 1.2rem;
+    color: var(--gold-bright);
+    margin-bottom: 1.1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(203, 162, 88, 0.2);
+    font-size: 0.82rem;
+}
+
+@media (max-width: 800px) {
+    .corner-south { bottom: 0.8rem; left: 1rem; }
+    .corner-north { top: 3.8rem; left: 1rem; }
+    .side-chozhi-dock { right: 1rem; bottom: 1rem; padding: 0.6rem 0.9rem; }
+}
