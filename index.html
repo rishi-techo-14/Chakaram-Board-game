@@ -1,294 +1,216 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ta">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chakaram • Chowka Bara (சக்கரம்)</title>
-    <link rel="stylesheet" href="styles.css" />
-
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chakaram Game • சக்கரம் 3D Playable Board Game</title>
+    <link rel="stylesheet" href="styles.css">
+    
     <!-- Three.js and OrbitControls via CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  </head>
-  <body>
-    <!-- 3D WebGL Canvas Viewport (Fixed Top-Down View) -->
+</head>
+<body>
+
+    <!-- 3D WebGL Viewport -->
     <div id="webgl-container"></div>
 
-    <!-- Multi-Step Home Page / Setup Modal -->
-    <div id="home-modal" class="modal-backdrop visible">
-      <div class="home-card">
-        <h2>☸ சக்கரம் • CHAKARAM</h2>
-        <div class="home-subtitle">
-          Chowka Bara • Katte Mane • Traditional Heritage Game
+    <!-- Game Started Welcome Modal -->
+    <div id="welcome-modal" class="welcome-modal-backdrop visible">
+        <div class="welcome-banner">
+            <h2>⚔️ ஆட்டம் துவங்கியது</h2>
+            <div class="banner-sub">CHAKARAM 3D • 4 வீரர்கள் களம் காண்கின்றனர்</div>
+            
+            <div class="welcome-houses-grid">
+                <div class="house-item">
+                    <span class="house-icon">♟️</span>
+                    <div class="house-info">
+                        <div class="house-title">தெற்கு வீரர் (Player 1 - You)</div>
+                        <div class="house-wood">தேக்கு மரம் • உடுக்கைக் காய் (Teak Spool)</div>
+                    </div>
+                </div>
+                <div class="house-item">
+                    <span class="house-icon">♟️</span>
+                    <div class="house-info">
+                        <div class="house-title">வடக்கு வீரர் (Player 2 - North AI)</div>
+                        <div class="house-wood">ஈட்டி மரம் • உருண்டைக் காய் (Rosewood Knob)</div>
+                    </div>
+                </div>
+                <div class="house-item">
+                    <span class="house-icon">♟️</span>
+                    <div class="house-info">
+                        <div class="house-title">கிழக்கு வீரர் (Player 3 - East AI)</div>
+                        <div class="house-wood">சந்தன மரம் • கூம்புக் காய் (Sandalwood Bullet)</div>
+                    </div>
+                </div>
+                <div class="house-item">
+                    <span class="house-icon">♟️</span>
+                    <div class="house-info">
+                        <div class="house-title">மேற்கு வீரர் (Player 4 - West AI)</div>
+                        <div class="house-wood">செம்மரம் • உடுக்கைக் காய் (Red Cedar Spool)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="banner-footer">
+                <button id="btn-dismiss-welcome" class="btn-start-game">🎲 ஆட்டத்தைத் தொடங்கு (Start Game)</button>
+            </div>
         </div>
-
-        <!-- STEP 1: Main Mode Choices -->
-        <div id="home-step-1" class="menu-options-grid">
-          <button class="menu-btn-choice" data-type="AI">
-            <span class="choice-icon">🤖</span>
-            <div>
-              <div class="choice-title">Play vs AI (கணினியுடன்)</div>
-              <div class="choice-desc">
-                1, 2, அல்லது 3 AI வீரர்களுடன் களம் காண்க
-              </div>
-            </div>
-          </button>
-
-          <button class="menu-btn-choice" data-type="LOCAL">
-            <span class="choice-icon">👥</span>
-            <div>
-              <div class="choice-title">Pass & Play (நண்பர்களுடன்)</div>
-              <div class="choice-desc">
-                2, 3, அல்லது 4 வீரர்கள் ஒரே திரையில்
-              </div>
-            </div>
-          </button>
-
-          <button class="menu-btn-choice" data-type="ONLINE">
-            <span class="choice-icon">🌐</span>
-            <div>
-              <div class="choice-title">Online using Code (குறியீடு மூலம்)</div>
-              <div class="choice-desc">
-                அறை குறியீட்டை உருவாக்கி நண்பரை அழைக்கவும்
-              </div>
-            </div>
-          </button>
-        </div>
-
-        <!-- STEP 2: Configure Selected Type -->
-        <div id="home-step-2" class="step2-view">
-          <div class="step2-header">
-            <button id="btn-back-step" class="btn-back-step">
-              ← பின்செல் (Back)
-            </button>
-            <span id="step2-type-title" class="section-label" style="margin: 0"
-              >அமைப்புகள்</span
-            >
-          </div>
-
-          <!-- AI Count (For AI Mode) -->
-          <div id="config-ai-section">
-            <div class="section-label">
-              AI வீரர்கள் எண்ணிக்கை (Number of AIs)
-            </div>
-            <div class="row-buttons">
-              <button class="btn-pill-opt selected" data-ai="1">
-                1 AI (2 வீரர்கள்)
-              </button>
-              <button class="btn-pill-opt" data-ai="2">
-                2 AIs (3 வீரர்கள்)
-              </button>
-              <button class="btn-pill-opt" data-ai="3">
-                3 AIs (4 வீரர்கள்)
-              </button>
-            </div>
-          </div>
-
-          <!-- Player Count (For Local Pass & Play) -->
-          <div id="config-local-section" style="display: none">
-            <div class="section-label">
-              வீரர்கள் எண்ணிக்கை (Number of Players)
-            </div>
-            <div class="row-buttons">
-              <button class="btn-pill-opt selected" data-players="2">
-                2 வீரர்கள்
-              </button>
-              <button class="btn-pill-opt" data-players="3">3 வீரர்கள்</button>
-              <button class="btn-pill-opt" data-players="4">4 வீரர்கள்</button>
-            </div>
-          </div>
-
-          <!-- Online Room Code (For Online Mode) -->
-          <div id="config-online-section" style="display: none">
-            <div class="section-label">அறை குறியீடு (Room Code)</div>
-            <div class="room-code-box">
-              <div id="generated-room-code" class="room-code-text">
-                CHKR-8392
-              </div>
-              <div
-                style="
-                  font-size: 0.7rem;
-                  color: var(--text-dim);
-                  margin-top: 0.3rem;
-                "
-              >
-                இந்த குறியீட்டை உங்கள் நண்பருடன் பகிரவும்
-              </div>
-            </div>
-          </div>
-
-          <!-- Board Size Selection (For All Modes) -->
-          <div class="section-label">பலகை அளவு (Board Size)</div>
-          <div class="row-buttons">
-            <button class="btn-pill-opt selected" data-grid="5">
-              5 x 5 (4 சோழிகள்)
-            </button>
-            <button class="btn-pill-opt" data-grid="7">
-              7 x 7 (6 சோழிகள்)
-            </button>
-          </div>
-
-          <button id="btn-start-final" class="btn-start-final">
-            🎲 ஆட்டத்தைத் தொடங்கு (Start Game)
-          </button>
-        </div>
-      </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal-backdrop">
-      <div class="settings-card">
-        <h3>
-          <span>⚙️ அமைப்புகள் (Settings)</span>
-          <button id="btn-close-settings" class="btn-back-step">✕</button>
-        </h3>
-
-        <div class="setting-row">
-          <span>🔔 ஒலி விளைவுகள் (Sound Effects)</span>
-          <button id="btn-toggle-sound" class="btn-header">
-            ஒலி இயக்கம் (On)
-          </button>
+    <!-- Victory Modal Celebration -->
+    <div id="victory-modal" class="victory-modal-backdrop">
+        <div class="victory-banner">
+            <h2 id="winner-title">🏆 வெற்றி வாகை!</h2>
+            <div id="winner-desc" class="banner-sub">All 4 coins crowned at Surya Chakram!</div>
+            <div class="banner-footer" style="margin-top: 1.5rem;">
+                <button id="btn-play-again" class="btn-start-game">🔄 மீண்டும் விளையாடு (Play Again)</button>
+            </div>
         </div>
-
-        <div class="setting-row">
-          <span>📐 கேமரா நிலை (Camera Mode)</span>
-          <span style="color: var(--gold-bright); font-weight: 700"
-            >Top-Down (நிலையான பார்வை)</span
-          >
-        </div>
-
-        <div class="setting-row">
-          <span>🛡️ விதிகளின் குறிப்பு</span>
-          <span style="color: var(--text-dim); font-size: 0.72rem"
-            >காய் நுழைய: 1 அல்லது 5 மட்டுமே</span
-          >
-        </div>
-      </div>
     </div>
 
-    <!-- Victory Celebration Modal -->
-    <div id="victory-modal" class="modal-backdrop">
-      <div class="home-card" style="max-width: 440px">
-        <h2 id="winner-title">🏆 வெற்றி வாகை!</h2>
-        <div id="winner-desc" class="home-subtitle">
-          அனைத்து 4 காய்களும் பழமாயின!
-        </div>
-        <button id="btn-play-again" class="btn-start-final">
-          🔄 புதிய ஆட்டம் (Play Again)
-        </button>
-      </div>
-    </div>
-
-    <!-- In-Game Minimalist UI Overlay -->
+    <!-- UI Overlay Layer -->
     <div class="ui-overlay">
-      <!-- Top Bar with Quit & Settings -->
-      <header class="top-bar">
-        <button id="btn-quit-game" class="btn-header btn-quit">
-          🚪 வெளியேறு (Quit)
-        </button>
+        
+        <!-- Top Navigation Header -->
+        <header class="header-bar">
+            <div class="brand-section">
+                <div class="brand-emblem">☸</div>
+                <div class="title-group">
+                    <h1>சக்கரம் • CHAKARAM</h1>
+                    <div class="subtitle">5x5 Tamil Daayam • 4 Players • 6 Chozhi</div>
+                </div>
+            </div>
 
-        <div class="brand-title">
-          <span>☸ சக்கரம்</span>
-          <span id="header-board-badge" class="badge-mode">5x5</span>
-        </div>
+            <!-- Active Player Turn Indicator Pill -->
+            <div id="turn-pill" class="turn-pill">
+                <div id="turn-dot" class="turn-dot"></div>
+                <div class="turn-info">
+                    <span id="turn-player-name" class="turn-name">தெற்கு வீரர் (Player 1)</span>
+                    <span id="turn-status-text" class="turn-status">🎲 உருட்ட தயார் (Ready to Roll)</span>
+                </div>
+            </div>
 
-        <div class="top-bar-actions">
-          <button id="btn-open-settings" class="btn-header">
-            ⚙️ அமைப்புகள்
-          </button>
-        </div>
-      </header>
+            <div class="header-actions">
+                <select id="game-mode-select" class="select-mode">
+                    <option value="1P_VS_AI">👤 1 Player vs 3 AI</option>
+                    <option value="2P_LOCAL">👥 2 Players Local</option>
+                    <option value="4P_LOCAL">👨‍👩‍👧‍👦 4 Players Pass & Play</option>
+                </select>
+                <button id="btn-start-game-header" class="btn-stone btn-highlight">⚔️ புதிய ஆட்டம் (New Match)</button>
+                <button id="btn-audio-mute" class="btn-stone">🔔 ஒலி (Sound)</button>
+            </div>
+        </header>
 
-      <!-- Subtle Notification / Hint Toast -->
-      <div id="hint-toast" class="hint-toast">
-        1 அல்லது 5 உருட்ட வேண்டும் (Need 1 or 5 to enter)
-      </div>
+        <!-- 4 Player Aligned Status Bar -->
+        <section class="players-status-bar">
+            <div id="player-chip-1" class="player-chip active-turn">
+                <div class="p-color-dot" style="background: #d4883b;"></div>
+                <span class="p-name">தெற்கு (You)</span>
+                <div class="p-stats">
+                    <span class="stat-item">🏠 <strong id="player-home-1">4</strong></span>
+                    <span class="stat-item">⚔️ <strong id="player-active-1">0</strong></span>
+                    <span class="stat-item stat-crown">🏆 <strong id="player-crowns-1">0/4</strong></span>
+                </div>
+            </div>
 
-      <!-- ==============================================================
-             CLEAN CORNER PLAYER CARDS (NO CLUMSY EMOJI PILLS)
-             ============================================================== -->
+            <div id="player-chip-2" class="player-chip">
+                <div class="p-color-dot" style="background: #8c4323;"></div>
+                <span class="p-name">வடக்கு (AI)</span>
+                <div class="p-stats">
+                    <span class="stat-item">🏠 <strong id="player-home-2">4</strong></span>
+                    <span class="stat-item">⚔️ <strong id="player-active-2">0</strong></span>
+                    <span class="stat-item stat-crown">🏆 <strong id="player-crowns-2">0/4</strong></span>
+                </div>
+            </div>
 
-      <!-- South (Player 1 - You) -->
-      <div id="player-corner-1" class="player-corner corner-south">
-        <div class="player-card-clean active-turn" id="card-p1">
-          <div
-            class="card-avatar"
-            style="background: #d4883b; color: #d4883b"
-          ></div>
-          <div class="card-info">
-            <span class="card-name" id="name-p1">தெற்கு (You)</span>
-            <span class="card-sub" id="sub-p1">உருட்ட தயார்</span>
-          </div>
-          <div class="card-status-dot"></div>
-        </div>
-      </div>
+            <div id="player-chip-3" class="player-chip">
+                <div class="p-color-dot" style="background: #d9b177;"></div>
+                <span class="p-name">கிழக்கு (AI)</span>
+                <div class="p-stats">
+                    <span class="stat-item">🏠 <strong id="player-home-3">4</strong></span>
+                    <span class="stat-item">⚔️ <strong id="player-active-3">0</strong></span>
+                    <span class="stat-item stat-crown">🏆 <strong id="player-crowns-3">0/4</strong></span>
+                </div>
+            </div>
 
-      <!-- West (Player 2) -->
-      <div id="player-corner-2" class="player-corner corner-west">
-        <div class="player-card-clean" id="card-p2">
-          <div
-            class="card-avatar"
-            style="background: #a8422b; color: #a8422b"
-          ></div>
-          <div class="card-info">
-            <span class="card-name" id="name-p2">மேற்கு (P2)</span>
-            <span class="card-sub" id="sub-p2">காத்திருக்கிறது</span>
-          </div>
-          <div class="card-status-dot"></div>
-        </div>
-      </div>
+            <div id="player-chip-4" class="player-chip">
+                <div class="p-color-dot" style="background: #a33b24;"></div>
+                <span class="p-name">மேற்கு (AI)</span>
+                <div class="p-stats">
+                    <span class="stat-item">🏠 <strong id="player-home-4">4</strong></span>
+                    <span class="stat-item">⚔️ <strong id="player-active-4">0</strong></span>
+                    <span class="stat-item stat-crown">🏆 <strong id="player-crowns-4">0/4</strong></span>
+                </div>
+            </div>
+        </section>
 
-      <!-- North (Player 3) -->
-      <div id="player-corner-3" class="player-corner corner-north">
-        <div class="player-card-clean" id="card-p3">
-          <div
-            class="card-avatar"
-            style="background: #7c3a21; color: #7c3a21"
-          ></div>
-          <div class="card-info">
-            <span class="card-name" id="name-p3">வடக்கு (P3)</span>
-            <span class="card-sub" id="sub-p3">காத்திருக்கிறது</span>
-          </div>
-          <div class="card-status-dot"></div>
-        </div>
-      </div>
+        <!-- Main HUD Area -->
+        <main class="main-ui">
+            
+            <!-- Compact Commentary Log (Bottom Left) -->
+            <section class="commentary-dock">
+                <div class="dock-title">📜 ஆட்ட நிகழ்வுகள் (Match Log)</div>
+                <ul id="match-log-list" class="match-log-list">
+                    <li>⚔️ புதிய ஆட்டம் துவங்கியது!</li>
+                </ul>
+            </section>
 
-      <!-- East (Player 4) -->
-      <div id="player-corner-4" class="player-corner corner-east">
-        <div class="player-card-clean" id="card-p4">
-          <div
-            class="card-avatar"
-            style="background: #d9b177; color: #d9b177"
-          ></div>
-          <div class="card-info">
-            <span class="card-name" id="name-p4">கிழக்கு (P4)</span>
-            <span class="card-sub" id="sub-p4">காத்திருக்கிறது</span>
-          </div>
-          <div class="card-status-dot"></div>
-        </div>
-      </div>
+            <!-- Redesigned Clean Chozhi Dice Dock (Bottom Right) -->
+            <section class="chozhi-dock">
+                <div class="dock-header">
+                    <h3>ஆறு சோழிகள் (6 Chozhi)</h3>
+                    <div id="chozhi-visual" class="shell-icons">
+                        <span class="shell-icon shell-open">🐚</span>
+                        <span class="shell-icon shell-open">🐚</span>
+                        <span class="shell-icon shell-open">🐚</span>
+                        <span class="shell-icon shell-closed">🌑</span>
+                        <span class="shell-icon shell-closed">🌑</span>
+                        <span class="shell-icon shell-closed">🌑</span>
+                    </div>
+                </div>
 
-      <!-- ==============================================================
-             SIDE CHOZHI ROLL DOCK (RIGHT SIDE OF THE BOARD IN PLAIN SIGHT)
-             ============================================================== -->
-      <div class="side-chozhi-dock">
-        <div class="chozhi-dock-title" id="chozhi-dock-title">
-          சோழிகள் (4 Chozhi)
-        </div>
+                <!-- Big Number Reveal Card -->
+                <div id="score-card" class="score-reveal-card">
+                    <div id="score-number" class="score-number">🎲 உருட்ட தயார்</div>
+                    <div id="score-desc" class="score-desc">Click button to roll 6 Chozhis</div>
+                </div>
 
-        <div id="side-shells-row" class="side-shells-row">
-          <span class="shell-icon shell-open">🐚</span>
-          <span class="shell-icon shell-open">🐚</span>
-          <span class="shell-icon shell-closed">🌑</span>
-          <span class="shell-icon shell-closed">🌑</span>
-        </div>
+                <!-- Roll Button (Disabled when a coin must move or while AI/animating) -->
+                <button id="btn-roll-chozhi" class="btn-roll-chozhi">🎲 சோழி உருட்டு (Roll 6 Chozhi)</button>
+            </section>
 
-        <div id="side-score-box" class="side-score-box">🎲</div>
+        </main>
 
-        <button id="btn-roll-chozhi" class="btn-roll-side">
-          🎲 உருட்டு (Roll)
-        </button>
-      </div>
+        <!-- Bottom Controls Dock -->
+        <footer class="bottom-dock">
+            <div class="control-group">
+                <span class="label">கேமரா:</span>
+                <button class="btn-stone active" data-camera="cinematic">🎥 Cinematic</button>
+                <button class="btn-stone" data-camera="topdown">📐 Top-Down 5x5</button>
+                <button class="btn-stone" data-camera="chozhi">🐚 சோழி களம்</button>
+            </div>
+
+            <div class="dock-divider"></div>
+
+            <div class="control-group">
+                <span class="label">பாறை:</span>
+                <button class="btn-stone active" data-theme="granite">கருங்கல்</button>
+                <button class="btn-stone" data-theme="sandstone">மணற்பாறை</button>
+                <button class="btn-stone" data-theme="bronze">வெண்கலம்</button>
+                <button class="btn-stone" data-theme="terracotta">சுடுமண்</button>
+            </div>
+
+            <div class="dock-divider"></div>
+
+            <div class="control-group">
+                <span class="label">ஒளி:</span>
+                <button class="btn-stone active" data-atmosphere="night">🪔 கோவில்</button>
+                <button class="btn-stone" data-atmosphere="dawn">🌅 வைகறை</button>
+                <button class="btn-stone" data-atmosphere="golden">✨ சந்தியா</button>
+            </div>
+        </footer>
+
     </div>
 
     <!-- Application Scripts -->
@@ -297,5 +219,5 @@
     <script src="gameEngine.js"></script>
     <script src="scene.js"></script>
     <script src="app.js"></script>
-  </body>
+</body>
 </html>

@@ -1,402 +1,273 @@
 /**
- * Application Manager for Chakaram (Chowka Bara) 3D
- * Connects 3D Scene, Rules Engine, Home Wizard, Quit Button, Settings, and Clean UI.
+ * Application Manager for Chakaram Game
+ * Connects 3D WebGL scene, Turn-Based Game Engine, UI HUD, audio engine, and player controls.
  */
 
-document.addEventListener("DOMContentLoaded", () => {
-  const container = document.getElementById("webgl-container");
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('webgl-container');
+    const scene = new Chakaram3DScene(container);
+    const engine = new ChakaramGameEngine();
+    window.chakaramEngine = engine;
 
-  // Default configuration
-  let selectedType = "AI";
-  let selectedAICount = 3; // 1, 2, or 3
-  let selectedPlayerCount = 4; // 2, 3, or 4
-  let selectedGridSize = 5; // 5 or 7
-  let roomCode = null;
+    // UI Elements
+    const turnPill = document.getElementById('turn-pill');
+    const turnDot = document.getElementById('turn-dot');
+    const turnPlayerName = document.getElementById('turn-player-name');
+    const turnStatusText = document.getElementById('turn-status-text');
 
-  const engine = new ChakaramGameEngine(selectedGridSize, 4, 3);
-  const scene = new Chakaram3DScene(container, selectedGridSize);
-  window.chakaramEngine = engine;
-  window.chakaramScene = scene;
+    const rollBtn = document.getElementById('btn-roll-chozhi');
+    const scoreCard = document.getElementById('score-card');
+    const scoreNumber = document.getElementById('score-number');
+    const scoreDesc = document.getElementById('score-desc');
+    const chozhiVisual = document.getElementById('chozhi-visual');
+    const matchLogList = document.getElementById('match-log-list');
 
-  // UI Elements
-  const homeModal = document.getElementById("home-modal");
-  const homeStep1 = document.getElementById("home-step-1");
-  const homeStep2 = document.getElementById("home-step-2");
-  const step2TypeTitle = document.getElementById("step2-type-title");
-  const btnBackStep = document.getElementById("btn-back-step");
-  const btnStartFinal = document.getElementById("btn-start-final");
+    const modeSelector = document.getElementById('game-mode-select');
+    const victoryModal = document.getElementById('victory-modal');
+    const winnerTitle = document.getElementById('winner-title');
+    const winnerDesc = document.getElementById('winner-desc');
+    const btnPlayAgain = document.getElementById('btn-play-again');
 
-  const configAISection = document.getElementById("config-ai-section");
-  const configLocalSection = document.getElementById("config-local-section");
-  const configOnlineSection = document.getElementById("config-online-section");
-  const generatedRoomCode = document.getElementById("generated-room-code");
+    const welcomeModal = document.getElementById('welcome-modal');
+    const btnDismissWelcome = document.getElementById('btn-dismiss-welcome');
+    const btnStartGameHeader = document.getElementById('btn-start-game-header');
 
-  const headerBoardBadge = document.getElementById("header-board-badge");
-  const btnQuitGame = document.getElementById("btn-quit-game");
-  const btnOpenSettings = document.getElementById("btn-open-settings");
-  const settingsModal = document.getElementById("settings-modal");
-  const btnCloseSettings = document.getElementById("btn-close-settings");
-  const btnToggleSound = document.getElementById("btn-toggle-sound");
+    const tamilNumsMap = { 0: '௦', 1: '௧', 2: '௨', 3: '௩', 4: '௪', 5: '௫', 6: '௬', 12: '௰௨' };
 
-  const hintToast = document.getElementById("hint-toast");
-  const victoryModal = document.getElementById("victory-modal");
-  const winnerTitle = document.getElementById("winner-title");
-  const winnerDesc = document.getElementById("winner-desc");
-  const btnPlayAgain = document.getElementById("btn-play-again");
+    // --- GAME ENGINE & 3D SCENE BINDINGS ---
 
-  // Side Chozhi Elements
-  const chozhiDockTitle = document.getElementById("chozhi-dock-title");
-  const sideShellsRow = document.getElementById("side-shells-row");
-  const sideScoreBox = document.getElementById("side-score-box");
-  const btnRollChozhi = document.getElementById("btn-roll-chozhi");
+    // 1. Chozhi Roll Result from 3D Scene -> Send to Game Engine
+    scene.onChozhiRolled = (result) => {
+        engine.handleRollResult(result);
+        displayRollResult(result);
+    };
 
-  const tamilNumMap = {
-    1: "௧",
-    2: "௨",
-    3: "௩",
-    4: "௪",
-    5: "௫",
-    6: "௬",
-    8: "௮",
-    12: "௰௨",
-  };
-
-  // --- GAME ENGINE & 3D SCENE EVENT BINDINGS ---
-
-  scene.onChozhiRolled = (result) => {
-    engine.handleRollResult(result);
-    displayRollResult(result);
-  };
-
-  engine.onMoveAvailable = (legalMoves) => {
-    scene.setMovableCoins(legalMoves);
-    const player = engine.getCurrentPlayer();
-    if (!player.isAI) {
-      showToast("👆 ஒளிரும் காயைத் தொடவும் (Select glowing coin)");
-    }
-  };
-
-  scene.onPawnClicked = (coinId, legalMove) => {
-    if (
-      !engine.hasRolled ||
-      engine.getCurrentPlayer().isAI ||
-      scene.isCoinAnimating
-    )
-      return;
-    hideToast();
-    engine.executeMove(legalMove.coin, engine.currentRoll.points, legalMove);
-  };
-
-  engine.onCoinMoved = (data) => {
-    hideToast();
-    scene.animatePawnMovement(
-      data.coin.id,
-      data.hopPath,
-      data.capturedCoin,
-      data.isGoal,
-      data.isUnlock,
-      data.onComplete,
-    );
-  };
-
-  engine.onStateChange = () => {
-    updateUI();
-  };
-
-  engine.onLogMessage = (code) => {
-    if (code === "NEED_1_OR_5") {
-      showToast("⚠️ 1 அல்லது 5 உருட்ட வேண்டும் (Need 1 or 5 to enter)");
-    } else if (code === "NO_MOVES") {
-      showToast("⚠️ நகர்த்த வழியில்லை (No moves)");
-    } else if (code === "BONUS_ROLL") {
-      showToast("🌟 கூடுதல் வாய்ப்பு! (Bonus Roll)");
-    }
-  };
-
-  engine.onGameOver = (winner) => {
-    if (victoryModal) {
-      winnerTitle.textContent = `🏆 ${winner.name} வெற்றி பெற்றார்!`;
-      winnerDesc.textContent = `${winner.wood} காய்கள் அனைத்தும் சூரிய சக்கரத்தை அடைந்து வாகை சூடின!`;
-      victoryModal.classList.add("visible");
-    }
-    if (window.templeAudio) {
-      window.templeAudio.playTempleBell(2.0);
-    }
-  };
-
-  function showToast(text) {
-    if (hintToast) {
-      hintToast.textContent = text;
-      hintToast.classList.add("visible");
-      setTimeout(() => {
-        if (hintToast) hintToast.classList.remove("visible");
-      }, 2500);
-    }
-  }
-
-  function hideToast() {
-    if (hintToast) hintToast.classList.remove("visible");
-  }
-
-  // --- DISPLAY ROLL SCORE IN SIDE DOCK ---
-  function displayRollResult(r) {
-    const pts = r.points;
-    const tamilGlyph = tamilNumMap[pts] || pts;
-
-    if (sideScoreBox) {
-      sideScoreBox.textContent = `${tamilGlyph} (${pts})`;
-    }
-
-    let shellsHTML = "";
-    for (let i = 0; i < r.upCount; i++) {
-      shellsHTML +=
-        '<span class="shell-icon shell-open" title="வாய் (UP)">🐚</span>';
-    }
-    for (let j = 0; j < r.downCount; j++) {
-      shellsHTML +=
-        '<span class="shell-icon shell-closed" title="முதுகு (DOWN)">🌑</span>';
-    }
-    if (sideShellsRow) sideShellsRow.innerHTML = shellsHTML;
-  }
-
-  // --- REFRESH CLEAN PLAYER CARDS & HUD ---
-  function updateUI() {
-    const player = engine.getCurrentPlayer();
-
-    // 1. Header Badge
-    if (headerBoardBadge) {
-      const shells = engine.gridSize === 7 ? "6 சோழி" : "4 சோழி";
-      headerBoardBadge.textContent = `${engine.gridSize}x${engine.gridSize} • ${shells}`;
-    }
-
-    if (chozhiDockTitle) {
-      chozhiDockTitle.textContent =
-        engine.gridSize === 7 ? "சோழிகள் (6 Chozhi)" : "சோழிகள் (4 Chozhi)";
-    }
-
-    // 2. Roll Button State
-    if (btnRollChozhi) {
-      if (player.isAI) {
-        btnRollChozhi.disabled = true;
-        btnRollChozhi.textContent = "🤖 சிந்திக்கிறது...";
-      } else if (engine.hasRolled) {
-        btnRollChozhi.disabled = true;
-        btnRollChozhi.textContent = "👆 காயைத் தொடவும்";
-      } else if (scene.isCoinAnimating || scene.isRollingChozhi) {
-        btnRollChozhi.disabled = true;
-        btnRollChozhi.textContent = "⏳ நகர்கிறது...";
-      } else {
-        btnRollChozhi.disabled = false;
-        btnRollChozhi.textContent = "🎲 சோழி உருட்டு (Roll)";
-      }
-    }
-
-    // 3. Update Clean Player Cards (Show only active players)
-    for (let pId = 1; pId <= 4; pId++) {
-      const corner = document.getElementById(`player-corner-${pId}`);
-      const card = document.getElementById(`card-p${pId}`);
-      const nameEl = document.getElementById(`name-p${pId}`);
-      const subEl = document.getElementById(`sub-p${pId}`);
-
-      const activeP = engine.players.find((p) => p.id === pId);
-
-      if (!activeP) {
-        if (corner) corner.style.display = "none";
-        continue;
-      }
-
-      if (corner) corner.style.display = "block";
-
-      const isCurrent = activeP.id === player.id;
-      if (card) {
-        card.classList.toggle("active-turn", isCurrent);
-      }
-
-      if (nameEl) {
-        nameEl.textContent = activeP.name;
-      }
-
-      if (subEl) {
-        let statusText = isCurrent
-          ? activeP.isAI
-            ? "சிந்திக்கிறது..."
-            : "உருட்ட தயார்"
-          : "காத்திருக்கிறது";
-        if (activeP.hasCutOpponent) {
-          statusText += " • ⚔️ வெட்டு";
+    // 2. Movable Coins Available -> Highlight in 3D Scene
+    engine.onMoveAvailable = (legalMoves) => {
+        scene.setMovableCoins(legalMoves);
+        const player = engine.getCurrentPlayer();
+        if (!player.isAI) {
+            scoreCard.classList.add('prompt-glow');
+            scoreDesc.innerHTML = '👆 <strong>ஒளிரும் காயைத் தொடவும்</strong> (Click a glowing coin to move)';
+            turnStatusText.textContent = '👆 காயைத் தொடவும் (Select Coin)';
         }
-        subEl.textContent = statusText;
-      }
+    };
+
+    // 3. Pawn Clicked in 3D Scene -> Execute Move
+    scene.onPawnClicked = (coinId, legalMove) => {
+        if (!engine.hasRolled || engine.getCurrentPlayer().isAI || scene.isCoinAnimating) return;
+        scoreCard.classList.remove('prompt-glow');
+        engine.executeMove(legalMove.coin, engine.currentRoll.points);
+    };
+
+    // 4. Coin Moved in Game Engine -> Trigger 3D Hopping in Scene
+    engine.onCoinMoved = (data) => {
+        scene.animatePawnMovement(
+            data.coin.id,
+            data.hopPath,
+            data.capturedCoin,
+            data.isGoal,
+            data.onComplete
+        );
+    };
+
+    // 5. Game State Changed -> Update Full UI HUD
+    engine.onStateChange = () => {
+        updateUI();
+    };
+
+    // 6. Match Log Entry -> Append to UI Ticker
+    engine.onLogMessage = (msg) => {
+        if (matchLogList) {
+            const li = document.createElement('li');
+            li.textContent = msg;
+            matchLogList.prepend(li);
+            while (matchLogList.children.length > 7) {
+                matchLogList.removeChild(matchLogList.lastChild);
+            }
+        }
+    };
+
+    // 7. Game Over -> Trigger Victory Ceremony
+    engine.onGameOver = (winner) => {
+        if (victoryModal) {
+            winnerTitle.textContent = `🏆 ${winner.name} வெற்றி பெற்றார்!`;
+            winnerDesc.textContent = `${winner.wood} காய்கள் அனைத்தும் சூரிய சக்கரத்தை அடைந்து வாகை சூடின! (All 4 coins crowned at Surya Chakram!)`;
+            victoryModal.classList.add('visible');
+        }
+        if (window.templeAudio) {
+            window.templeAudio.playTempleBell(2.0);
+        }
+    };
+
+    // --- DISPLAY ROLL NUMBER AFTER EACH ROLL ---
+    function displayRollResult(r) {
+        const pts = r.points;
+        const tamilGlyph = tamilNumsMap[pts] || pts;
+
+        let numText = `எண்: ${tamilGlyph} (${pts})`;
+        let descText = `மேல்நோக்கிய வாய்: ${r.upCount} | கீழ்நோக்கிய முதுகு: ${r.downCount}`;
+
+        if (r.isDaayam) {
+            numText = `🌟 தாயக்கட்டை! (1)`;
+            descText = `1 வாய் மேல்நோக்கி • களம் புகும் வாய்ப்பு! (Bonus Roll)`;
+        } else if (r.isSix) {
+            numText = `✨ ௬ புள்ளிகள் (6)`;
+            descText = `அனைத்து 6 வாய்களும் மேல்நோக்கி! (All UP • Bonus Roll)`;
+        } else if (r.isTwelve) {
+            numText = `🔥 பன்னிரண்டு! (12)`;
+            descText = `அனைத்து 6 வாய்களும் கீழ்நோக்கி! (All DOWN • Bonus Roll)`;
+        }
+
+        if (scoreNumber) scoreNumber.textContent = numText;
+        if (scoreDesc) scoreDesc.textContent = descText;
+
+        // Shell icons display
+        let shellIcons = '';
+        for (let i = 0; i < r.upCount; i++) shellIcons += '<span class="shell-icon shell-open" title="வாய் (UP)">🐚</span>';
+        for (let j = 0; j < r.downCount; j++) shellIcons += '<span class="shell-icon shell-closed" title="முதுகு (DOWN)">🌑</span>';
+        if (chozhiVisual) chozhiVisual.innerHTML = shellIcons;
     }
 
-    if (!engine.hasRolled && !player.isAI) {
-      hideToast();
-      if (sideScoreBox && !engine.currentRoll) sideScoreBox.textContent = "🎲";
+    // --- UI HUD UPDATES ---
+    function updateUI() {
+        const player = engine.getCurrentPlayer();
+
+        // 1. Turn Indicator Pill
+        if (turnPlayerName) {
+            turnPlayerName.textContent = player.name;
+            turnDot.style.background = player.color;
+            turnDot.style.boxShadow = `0 0 10px ${player.color}`;
+            turnPill.style.borderColor = player.color;
+
+            if (player.isAI) {
+                turnStatusText.textContent = '🤖 கணினி சிந்திக்கிறது... (AI Playing)';
+            } else if (engine.hasRolled) {
+                turnStatusText.textContent = '👆 காயைத் தொடவும் (Select Coin)';
+            } else {
+                turnStatusText.textContent = '🎲 உருட்ட தயார் (Ready to Roll)';
+            }
+        }
+
+        // 2. Roll Button State (Strictly disabled while any coin needs to move or AI is playing)
+        if (rollBtn) {
+            if (player.isAI) {
+                rollBtn.disabled = true;
+                rollBtn.textContent = '🤖 கணினி முறை (AI Turn)';
+            } else if (engine.hasRolled) {
+                rollBtn.disabled = true;
+                rollBtn.textContent = '♟️ காயைத் தொடவும் (Move Coin)';
+            } else if (scene.isCoinAnimating || scene.isRollingChozhi) {
+                rollBtn.disabled = true;
+                rollBtn.textContent = '⏳ நகர்கிறது... (Moving)';
+            } else {
+                rollBtn.disabled = false;
+                rollBtn.textContent = '🎲 சோழி உருட்டு (Roll 6 Chozhi)';
+            }
+        }
+
+        // 3. Update 4 Player Status Chips
+        engine.players.forEach(p => {
+            const chip = document.getElementById(`player-chip-${p.id}`);
+            const crownBadge = document.getElementById(`player-crowns-${p.id}`);
+            const homeBadge = document.getElementById(`player-home-${p.id}`);
+            const activeBadge = document.getElementById(`player-active-${p.id}`);
+
+            if (chip) {
+                chip.classList.toggle('active-turn', p.id === player.id);
+            }
+            if (crownBadge) crownBadge.textContent = `${p.crownedCount}/4`;
+            if (homeBadge) {
+                const homeCount = p.coins.filter(c => c.status === 'HOME').length;
+                homeBadge.textContent = homeCount;
+            }
+            if (activeBadge) {
+                const actCount = p.coins.filter(c => c.status === 'ACTIVE').length;
+                activeBadge.textContent = actCount;
+            }
+        });
+
+        // 4. Reset score card prompt when roll is pending
+        if (!engine.hasRolled && !player.isAI) {
+            scoreCard.classList.remove('prompt-glow');
+            if (scoreNumber && !engine.currentRoll) scoreNumber.textContent = '🎲 உருட்ட தயார்';
+            if (scoreDesc && !engine.currentRoll) scoreDesc.textContent = 'Click button or brass tray to roll';
+        }
     }
-  }
 
-  // --- HOME WIZARD FLOW ---
+    // --- EVENT LISTENERS ---
 
-  // Step 1: Mode choices
-  document.querySelectorAll(".menu-btn-choice").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      selectedType = btn.getAttribute("data-type");
-      openStep2(selectedType);
-    });
-  });
-
-  function openStep2(type) {
-    homeStep1.style.display = "none";
-    homeStep2.classList.add("active");
-
-    if (type === "AI") {
-      step2TypeTitle.textContent = "Play vs AI (கணினியுடன்)";
-      configAISection.style.display = "block";
-      configLocalSection.style.display = "none";
-      configOnlineSection.style.display = "none";
-    } else if (type === "LOCAL") {
-      step2TypeTitle.textContent = "Pass & Play (நண்பர்களுடன்)";
-      configAISection.style.display = "none";
-      configLocalSection.style.display = "block";
-      configOnlineSection.style.display = "none";
-    } else if (type === "ONLINE") {
-      step2TypeTitle.textContent = "Online using Code";
-      configAISection.style.display = "none";
-      configLocalSection.style.display = "none";
-      configOnlineSection.style.display = "block";
-      roomCode = "CHKR-" + Math.floor(1000 + Math.random() * 9000);
-      if (generatedRoomCode) generatedRoomCode.textContent = roomCode;
+    // Roll Button Listener
+    if (rollBtn) {
+        rollBtn.addEventListener('click', () => {
+            if (!engine.hasRolled && !engine.getCurrentPlayer().isAI && !scene.isCoinAnimating && !scene.isRollingChozhi) {
+                scene.rollChozhi();
+            }
+        });
     }
-  }
 
-  if (btnBackStep) {
-    btnBackStep.addEventListener("click", () => {
-      homeStep2.classList.remove("active");
-      homeStep1.style.display = "flex";
+    // Game Mode Switcher
+    if (modeSelector) {
+        modeSelector.addEventListener('change', (e) => {
+            engine.setGameMode(e.target.value);
+            scene.resetAllPawns();
+            if (window.templeAudio) window.templeAudio.playStoneClack();
+        });
+    }
+
+    // Welcome Modal Handlers
+    const startNewGame = () => {
+        if (welcomeModal) welcomeModal.classList.remove('visible');
+        if (victoryModal) victoryModal.classList.remove('visible');
+        engine.resetGame();
+        scene.resetAllPawns();
+        if (window.templeAudio) window.templeAudio.playTempleBell(1.2);
+    };
+
+    if (btnDismissWelcome) btnDismissWelcome.addEventListener('click', startNewGame);
+    if (btnStartGameHeader) btnStartGameHeader.addEventListener('click', () => {
+        if (welcomeModal) welcomeModal.classList.add('visible');
     });
-  }
+    if (btnPlayAgain) btnPlayAgain.addEventListener('click', startNewGame);
 
-  // AI Count Pills
-  document.querySelectorAll("[data-ai]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document
-        .querySelectorAll("[data-ai]")
-        .forEach((b) => b.classList.remove("selected"));
-      btn.classList.add("selected");
-      selectedAICount = parseInt(btn.getAttribute("data-ai"), 10);
+    // Camera Preset Buttons
+    document.querySelectorAll('[data-camera]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('[data-camera]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            scene.setCameraPreset(btn.getAttribute('data-camera'));
+            if (window.templeAudio) window.templeAudio.playStoneClack();
+        });
     });
-  });
 
-  // Local Player Count Pills
-  document.querySelectorAll("[data-players]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document
-        .querySelectorAll("[data-players]")
-        .forEach((b) => b.classList.remove("selected"));
-      btn.classList.add("selected");
-      selectedPlayerCount = parseInt(btn.getAttribute("data-players"), 10);
+    // Material / Stone Theme Switchers
+    document.querySelectorAll('[data-theme]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('[data-theme]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            scene.setTheme(btn.getAttribute('data-theme'));
+        });
     });
-  });
 
-  // Board Size Pills (5x5 or 7x7)
-  document.querySelectorAll("[data-grid]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document
-        .querySelectorAll("[data-grid]")
-        .forEach((b) => b.classList.remove("selected"));
-      btn.classList.add("selected");
-      selectedGridSize = parseInt(btn.getAttribute("data-grid"), 10);
+    // Atmosphere Lighting Switchers
+    document.querySelectorAll('[data-atmosphere]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('[data-atmosphere]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            scene.setAtmosphere(btn.getAttribute('data-atmosphere'));
+        });
     });
-  });
 
-  // START MATCH FROM WIZARD
-  if (btnStartFinal) {
-    btnStartFinal.addEventListener("click", () => {
-      let pCount = 4;
-      let aiCount = 3;
+    // Audio Controls
+    const btnMute = document.getElementById('btn-audio-mute');
+    if (btnMute) {
+        btnMute.addEventListener('click', () => {
+            const isMuted = window.templeAudio.toggleMute();
+            btnMute.innerHTML = isMuted ? '🔇 ஒலி முடக்கு (Muted)' : '🔔 ஒலி (Sound On)';
+            btnMute.classList.toggle('btn-highlight', isMuted);
+        });
+    }
 
-      if (selectedType === "AI") {
-        pCount = selectedAICount + 1;
-        aiCount = selectedAICount;
-      } else if (selectedType === "LOCAL") {
-        pCount = selectedPlayerCount;
-        aiCount = 0;
-      } else if (selectedType === "ONLINE") {
-        pCount = 2;
-        aiCount = 0;
-      }
-
-      engine.setMatchConfig(selectedGridSize, pCount, aiCount, roomCode);
-      scene.rebuildBoard(selectedGridSize);
-
-      // Initialize shells row
-      const numShells = selectedGridSize === 7 ? 6 : 4;
-      let initialShells = "";
-      for (let i = 0; i < numShells / 2; i++)
-        initialShells += '<span class="shell-icon shell-open">🐚</span>';
-      for (let j = 0; j < numShells / 2; j++)
-        initialShells += '<span class="shell-icon shell-closed">🌑</span>';
-      if (sideShellsRow) sideShellsRow.innerHTML = initialShells;
-
-      homeModal.classList.remove("visible");
-      updateUI();
-      if (window.templeAudio) window.templeAudio.playTempleBell(1.2);
-    });
-  }
-
-  // --- QUIT BUTTON (RETURNS TO HOME MENU) ---
-  if (btnQuitGame) {
-    btnQuitGame.addEventListener("click", () => {
-      homeStep2.classList.remove("active");
-      homeStep1.style.display = "flex";
-      homeModal.classList.add("visible");
-    });
-  }
-
-  // Play Again button
-  if (btnPlayAgain) {
-    btnPlayAgain.addEventListener("click", () => {
-      if (victoryModal) victoryModal.classList.remove("visible");
-      homeStep2.classList.remove("active");
-      homeStep1.style.display = "flex";
-      homeModal.classList.add("visible");
-    });
-  }
-
-  // --- SETTINGS MODAL ---
-  if (btnOpenSettings) {
-    btnOpenSettings.addEventListener("click", () => {
-      if (settingsModal) settingsModal.classList.add("visible");
-    });
-  }
-  if (btnCloseSettings) {
-    btnCloseSettings.addEventListener("click", () => {
-      if (settingsModal) settingsModal.classList.remove("visible");
-    });
-  }
-  if (btnToggleSound) {
-    btnToggleSound.addEventListener("click", () => {
-      const isMuted = window.templeAudio.toggleMute();
-      btnToggleSound.textContent = isMuted
-        ? "ஒலி முடக்கம் (Muted)"
-        : "ஒலி இயக்கம் (On)";
-    });
-  }
-
-  // Roll Button Listener
-  if (btnRollChozhi) {
-    btnRollChozhi.addEventListener("click", () => {
-      if (
-        !engine.hasRolled &&
-        !engine.getCurrentPlayer().isAI &&
-        !scene.isCoinAnimating &&
-        !scene.isRollingChozhi
-      ) {
-        scene.rollChozhi();
-      }
-    });
-  }
-
-  // Initial render
-  updateUI();
+    // Initial render
+    updateUI();
 });

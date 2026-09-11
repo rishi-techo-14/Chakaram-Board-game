@@ -1,755 +1,411 @@
 /**
- * Chakaram (Chowka Bara) Game Engine
- * Supporting both 5x5 and 7x7 Boards, 2 to 4 Players (1, 2, or 3 AIs / Pass & Play / Online)
- *
+ * Chakaram Game Engine - Turn-based 5x5 Tamil Daayam Rules & AI
+ * 
  * Rules:
- * - Starting a coin: Throwing 1 or 5 ONLY unlocks a coin from the Home Yard onto the board!
- * - 5x5 Board: 4 Cowrie Shells (Rolls: 1, 2, 3, 4, 8). Extra roll on 1, 4, 8, or capture.
- * - 7x7 Board: 6 Cowrie Shells (Rolls: 1, 2, 3, 4, 5, 6, 12). Extra roll on 1, 5, 6, 12, or capture.
- * - Cut / Capture Requirement: A player MUST capture (cut) an opponent coin to enter inner tracks!
- * - Safe Houses: 4 Midpoint entry houses (with flower emblems) and center goal.
- * - Winner: First player to crown all 4 coins at the central Surya Chakram!
+ * - 4 Players: Player 1 (South - Teak), Player 2 (North - Rosewood),
+ *              Player 3 (East - Sandalwood), Player 4 (West - Red Cedar)
+ * - 4 Coins per player (Total 16 coins)
+ * - Safe Houses: 8 fortress tiles (4 corners + 4 edge midpoints)
+ * - Entry Condition: Roll of 1 (Daayam), 5, 6, or 12 unlocks a coin from home to active path.
+ * - Bonus Rolls: Rolling 1 (Daayam), 6, 12, or capturing an opponent awards an extra turn!
+ * - Outer Perimeter (16 steps) -> Inner Ring (8 steps) -> Center Surya Chakram (Victory Goal).
+ * - First player to crown all 4 coins at the center wins!
  */
 
 class ChakaramGameEngine {
-  constructor(gridSize = 5, playerCount = 4, aiCount = 3) {
-    this.gridSize = gridSize; // 5 or 7
-    this.playerCount = playerCount; // 2, 3, or 4
-    this.aiCount = aiCount; // 0 (pass&play), 1, 2, 3
-    this.players = [];
-    this.currentTurnIndex = 0;
-    this.currentRoll = null;
-    this.hasRolled = false;
-    this.isGameOver = false;
-    this.winner = null;
-    this.roomCode = null;
+    constructor() {
+        this.players = [
+            { id: 1, name: 'தெற்கு வீரர் (Player 1)', wood: 'தேக்கு (Teak)', color: '#d4883b', isAI: false, startPos: { row: 4, col: 2 }, coins: [], crownedCount: 0 },
+            { id: 2, name: 'வடக்கு வீரர் (Player 2)', wood: 'ஈட்டி (Rosewood)', color: '#542817', isAI: true, startPos: { row: 0, col: 2 }, coins: [], crownedCount: 0 },
+            { id: 3, name: 'கிழக்கு வீரர் (Player 3)', wood: 'சந்தனம் (Sandalwood)', color: '#d9b177', isAI: true, startPos: { row: 2, col: 4 }, coins: [], crownedCount: 0 },
+            { id: 4, name: 'மேற்கு வீரர் (Player 4)', wood: 'செம்மரம் (Red Cedar)', color: '#8a3420', isAI: true, startPos: { row: 2, col: 0 }, coins: [], crownedCount: 0 }
+        ];
 
-    // Callbacks
-    this.onStateChange = null;
-    this.onLogMessage = null;
-    this.onMoveAvailable = null;
-    this.onCoinMoved = null;
-    this.onCapture = null;
-    this.onCrowned = null;
-    this.onGameOver = null;
+        this.currentTurnIndex = 0; // Index 0 to 3
+        this.currentRoll = null;
+        this.hasRolled = false;
+        this.gameMode = '1P_VS_AI'; // '1P_VS_AI', '2P_LOCAL', '4P_LOCAL'
+        this.isGameOver = false;
+        this.winner = null;
+        this.matchLogs = [];
 
-    this.initBoardConfig();
-    this.initPlayers();
-  }
+        // Safe Houses on 5x5 board (8 total)
+        this.safeTiles = new Set([
+            '0,0', '0,4', '4,0', '4,4', // 4 Corners
+            '0,2', '2,0', '2,4', '4,2'  // 4 Midpoints
+        ]);
 
-  setMatchConfig(gridSize, playerCount, aiCount, roomCode = null) {
-    this.gridSize = parseInt(gridSize, 10) || 5;
-    this.playerCount = parseInt(playerCount, 10) || 4;
-    this.aiCount = parseInt(aiCount, 10);
-    this.roomCode = roomCode;
-    this.initBoardConfig();
-    this.initPlayers();
-    this.resetGame();
-  }
+        // Precompute spiral paths for all 4 players
+        this.playerPaths = this.generatePlayerPaths();
 
-  initBoardConfig() {
-    const N = this.gridSize;
-    const mid = Math.floor(N / 2);
+        // Callbacks for UI & 3D Scene
+        this.onStateChange = null;
+        this.onLogMessage = null;
+        this.onMoveAvailable = null;
+        this.onCoinMoved = null;
+        this.onCapture = null;
+        this.onCrowned = null;
+        this.onGameOver = null;
 
-    this.safeTiles = new Set();
-
-    if (N === 5) {
-      // 5x5: 4 Midpoint safe houses + Center
-      const safes = [
-        "0,2",
-        "2,0",
-        "2,4",
-        "4,2", // 4 Midpoints
-        "2,2", // Center Goal
-      ];
-      safes.forEach((k) => this.safeTiles.add(k));
-    } else {
-      // 7x7: 4 Midpoints + Middle ring safe houses + Center
-      const safes = [
-        "0,3",
-        "3,0",
-        "3,6",
-        "6,3",
-        "1,1",
-        "1,5",
-        "5,1",
-        "5,5",
-        "1,3",
-        "3,1",
-        "3,5",
-        "5,3",
-        "2,2",
-        "2,4",
-        "4,2",
-        "4,4",
-        "3,3",
-      ];
-      safes.forEach((k) => this.safeTiles.add(k));
+        this.initCoins();
     }
 
-    this.playerTracks = this.generateAllPlayerTracks();
-  }
-
-  // Configure 2, 3, or 4 active players
-  initPlayers() {
-    const N = this.gridSize;
-    const mid = Math.floor(N / 2);
-
-    const allDefinitions = [
-      {
-        id: 1,
-        name: "தெற்கு (You)",
-        wood: "தேக்கு (Teak)",
-        color: "#d4883b",
-        isAI: false,
-        startPos: { row: N - 1, col: mid },
-        side: "SOUTH",
-        yardIndex: 0,
-      },
-      {
-        id: 2,
-        name: "மேற்கு (P2)",
-        wood: "செம்மரம் (Red Cedar)",
-        color: "#a8422b",
-        isAI: true,
-        startPos: { row: mid, col: 0 },
-        side: "WEST",
-        yardIndex: 1,
-      },
-      {
-        id: 3,
-        name: "வடக்கு (P3)",
-        wood: "ஈட்டி (Rosewood)",
-        color: "#7c3a21",
-        isAI: true,
-        startPos: { row: 0, col: mid },
-        side: "NORTH",
-        yardIndex: 2,
-      },
-      {
-        id: 4,
-        name: "கிழக்கு (P4)",
-        wood: "சந்தனம் (Sandalwood)",
-        color: "#d9b177",
-        isAI: true,
-        startPos: { row: mid, col: N - 1 },
-        side: "EAST",
-        yardIndex: 3,
-      },
-    ];
-
-    if (this.playerCount === 2) {
-      // 2 Players: South vs North (opposite across board!)
-      this.players = [
-        allDefinitions[0], // South (P1)
-        {
-          ...allDefinitions[2],
-          id: 2,
-          name: this.aiCount >= 1 ? "வடக்கு (AI)" : "வடக்கு (P2)",
-        }, // North (P2)
-      ];
-    } else if (this.playerCount === 3) {
-      // 3 Players: South, West, North
-      this.players = [allDefinitions[0], allDefinitions[1], allDefinitions[2]];
-    } else {
-      // 4 Players: South, West, North, East
-      this.players = allDefinitions.map((p) => ({ ...p }));
-    }
-
-    // Apply AI assignment based on aiCount
-    // P1 is always Human (South)
-    this.players[0].isAI = false;
-    for (let i = 1; i < this.players.length; i++) {
-      if (this.aiCount === 0) {
-        // Pass and Play
-        this.players[i].isAI = false;
-        this.players[i].name = `${this.players[i].side} (P${i + 1})`;
-      } else {
-        // AI opponent
-        this.players[i].isAI = true;
-        this.players[i].name = `${this.players[i].side} (AI)`;
-      }
-    }
-
-    this.initCoins();
-  }
-
-  initCoins() {
-    this.players.forEach((p) => {
-      p.coins = [];
-      p.crownedCount = 0;
-      p.hasCutOpponent = false;
-      for (let i = 0; i < 4; i++) {
-        p.coins.push({
-          id: `${p.id}_${i}`,
-          playerId: p.id,
-          pawnIndex: i,
-          status: "HOME", // 'HOME', 'ACTIVE', 'CROWNED'
-          track: "OUTER",
-          trackStep: -1,
-          row: p.startPos.row,
-          col: p.startPos.col,
-          slotIndex: i, // resting spot index in home yard (0, 1, 2, 3)
+    // Initialize 4 coins per player
+    initCoins() {
+        this.players.forEach(p => {
+            p.coins = [];
+            p.crownedCount = 0;
+            for (let i = 0; i < 4; i++) {
+                p.coins.push({
+                    id: `${p.id}_${i}`,
+                    playerId: p.id,
+                    pawnIndex: i,
+                    status: 'HOME', // 'HOME', 'ACTIVE', 'CROWNED'
+                    pathStep: -1, // -1 means at HOME base
+                    row: p.startPos.row,
+                    col: p.startPos.col,
+                    hasCutOpponent: false
+                });
+            }
         });
-      }
-    });
-  }
-
-  // Generate concentric tracks
-  generateAllPlayerTracks() {
-    const N = this.gridSize;
-
-    const rotateCoord = (coord, times) => {
-      let { r, c } = coord;
-      for (let i = 0; i < times; i++) {
-        const nr = c;
-        const nc = N - 1 - r;
-        r = nr;
-        c = nc;
-      }
-      return { r, c };
-    };
-
-    const rotateTrack = (track, times) => {
-      return track.map((pt) => rotateCoord(pt, times));
-    };
-
-    if (N === 5) {
-      const southOuter = [
-        { r: 4, c: 2 },
-        { r: 4, c: 1 },
-        { r: 4, c: 0 },
-        { r: 3, c: 0 },
-        { r: 2, c: 0 },
-        { r: 1, c: 0 },
-        { r: 0, c: 0 },
-        { r: 0, c: 1 },
-        { r: 0, c: 2 },
-        { r: 0, c: 3 },
-        { r: 0, c: 4 },
-        { r: 1, c: 4 },
-        { r: 2, c: 4 },
-        { r: 3, c: 4 },
-        { r: 4, c: 4 },
-        { r: 4, c: 3 },
-      ];
-
-      const southInner = [
-        { r: 3, c: 2 },
-        { r: 3, c: 1 },
-        { r: 2, c: 1 },
-        { r: 1, c: 1 },
-        { r: 1, c: 2 },
-        { r: 1, c: 3 },
-        { r: 2, c: 3 },
-        { r: 3, c: 3 },
-      ];
-
-      const center = [{ r: 2, c: 2 }];
-
-      return {
-        SOUTH: { outer: southOuter, inner: southInner, center: center },
-        WEST: {
-          outer: rotateTrack(southOuter, 1),
-          inner: rotateTrack(southInner, 1),
-          center: center,
-        },
-        NORTH: {
-          outer: rotateTrack(southOuter, 2),
-          inner: rotateTrack(southInner, 2),
-          center: center,
-        },
-        EAST: {
-          outer: rotateTrack(southOuter, 3),
-          inner: rotateTrack(southInner, 3),
-          center: center,
-        },
-      };
-    } else {
-      const southOuter = [
-        { r: 6, c: 3 },
-        { r: 6, c: 2 },
-        { r: 6, c: 1 },
-        { r: 6, c: 0 },
-        { r: 5, c: 0 },
-        { r: 4, c: 0 },
-        { r: 3, c: 0 },
-        { r: 2, c: 0 },
-        { r: 1, c: 0 },
-        { r: 0, c: 0 },
-        { r: 0, c: 1 },
-        { r: 0, c: 2 },
-        { r: 0, c: 3 },
-        { r: 0, c: 4 },
-        { r: 0, c: 5 },
-        { r: 0, c: 6 },
-        { r: 1, c: 6 },
-        { r: 2, c: 6 },
-        { r: 3, c: 6 },
-        { r: 4, c: 6 },
-        { r: 5, c: 6 },
-        { r: 6, c: 6 },
-        { r: 6, c: 5 },
-        { r: 6, c: 4 },
-      ];
-
-      const southMiddle = [
-        { r: 5, c: 3 },
-        { r: 5, c: 4 },
-        { r: 5, c: 5 },
-        { r: 4, c: 5 },
-        { r: 3, c: 5 },
-        { r: 2, c: 5 },
-        { r: 1, c: 5 },
-        { r: 1, c: 4 },
-        { r: 1, c: 3 },
-        { r: 1, c: 2 },
-        { r: 1, c: 1 },
-        { r: 2, c: 1 },
-        { r: 3, c: 1 },
-        { r: 4, c: 1 },
-        { r: 5, c: 1 },
-        { r: 5, c: 2 },
-      ];
-
-      const southInner = [
-        { r: 4, c: 3 },
-        { r: 4, c: 2 },
-        { r: 3, c: 2 },
-        { r: 2, c: 2 },
-        { r: 2, c: 3 },
-        { r: 2, c: 4 },
-        { r: 3, c: 4 },
-        { r: 4, c: 4 },
-      ];
-
-      const center = [{ r: 3, c: 3 }];
-
-      return {
-        SOUTH: {
-          outer: southOuter,
-          middle: southMiddle,
-          inner: southInner,
-          center: center,
-        },
-        WEST: {
-          outer: rotateTrack(southOuter, 1),
-          middle: rotateTrack(southMiddle, 1),
-          inner: rotateTrack(southInner, 1),
-          center: center,
-        },
-        NORTH: {
-          outer: rotateTrack(southOuter, 2),
-          middle: rotateTrack(southMiddle, 2),
-          inner: rotateTrack(southInner, 2),
-          center: center,
-        },
-        EAST: {
-          outer: rotateTrack(southOuter, 3),
-          middle: rotateTrack(southMiddle, 3),
-          inner: rotateTrack(southInner, 3),
-          center: center,
-        },
-      };
     }
-  }
 
-  resetGame() {
-    this.initCoins();
-    this.currentTurnIndex = 0;
-    this.currentRoll = null;
-    this.hasRolled = false;
-    this.isGameOver = false;
-    this.winner = null;
-    if (this.onStateChange) this.onStateChange();
-  }
+    // Generate authentic 5x5 Tamil Daayam 25-step paths for each player
+    generatePlayerPaths() {
+        // Outer loop (16 steps counter-clockwise):
+        // South: (4,2)->(4,1)->(4,0)->(3,0)->(2,0)->(1,0)->(0,0)->(0,1)->(0,2)->(0,3)->(0,4)->(1,4)->(2,4)->(3,4)->(4,4)->(4,3)
+        // Inner ring (8 steps): (3,2)->(3,1)->(2,1)->(1,1)->(1,2)->(1,3)->(2,3)->(3,3)
+        // Center (1 step): (2,2)
+        const southPath = [
+            // Outer 16 steps
+            { r: 4, c: 2 }, { r: 4, c: 1 }, { r: 4, c: 0 }, { r: 3, c: 0 },
+            { r: 2, c: 0 }, { r: 1, c: 0 }, { r: 0, c: 0 }, { r: 0, c: 1 },
+            { r: 0, c: 2 }, { r: 0, c: 3 }, { r: 0, c: 4 }, { r: 1, c: 4 },
+            { r: 2, c: 4 }, { r: 3, c: 4 }, { r: 4, c: 4 }, { r: 4, c: 3 },
+            // Inner 8 steps
+            { r: 3, c: 2 }, { r: 3, c: 1 }, { r: 2, c: 1 }, { r: 1, c: 1 },
+            { r: 1, c: 2 }, { r: 1, c: 3 }, { r: 2, c: 3 }, { r: 3, c: 3 },
+            // Center Goal
+            { r: 2, c: 2 }
+        ];
 
-  getCurrentPlayer() {
-    return this.players[this.currentTurnIndex];
-  }
+        // Helper to rotate a coordinate around center (2,2)
+        const rotateCoord = (coord, times) => {
+            let { r, c } = coord;
+            for (let i = 0; i < times; i++) {
+                const newR = c;
+                const newC = 4 - r;
+                r = newR;
+                c = newC;
+            }
+            return { r, c };
+        };
 
-  isBonusRoll(score) {
-    if (this.gridSize === 5) {
-      return score === 1 || score === 4 || score === 8;
-    } else {
-      return score === 1 || score === 5 || score === 6 || score === 12;
+        return {
+            1: southPath, // South (0 deg)
+            4: southPath.map(p => rotateCoord(p, 1)), // West (90 deg)
+            2: southPath.map(p => rotateCoord(p, 2)), // North (180 deg)
+            3: southPath.map(p => rotateCoord(p, 3))  // East (270 deg)
+        };
     }
-  }
 
-  // STRICT RULE: ONLY 1 OR 5 UNLOCKS A COIN FROM HOME!
-  isUnlockRoll(score) {
-    return score === 1 || score === 5;
-  }
+    setGameMode(mode) {
+        this.gameMode = mode;
+        if (mode === '1P_VS_AI') {
+            this.players[0].isAI = false;
+            this.players[1].isAI = true;
+            this.players[2].isAI = true;
+            this.players[3].isAI = true;
+        } else if (mode === '2P_LOCAL') {
+            this.players[0].isAI = false; // South
+            this.players[1].isAI = false; // North
+            this.players[2].isAI = true;
+            this.players[3].isAI = true;
+        } else if (mode === '4P_LOCAL') {
+            this.players[0].isAI = false;
+            this.players[1].isAI = false;
+            this.players[2].isAI = false;
+            this.players[3].isAI = false;
+        }
+        this.resetGame();
+    }
 
-  handleRollResult(rollData) {
-    if (this.isGameOver || this.hasRolled) return;
+    resetGame() {
+        this.initCoins();
+        this.currentTurnIndex = 0;
+        this.currentRoll = null;
+        this.hasRolled = false;
+        this.isGameOver = false;
+        this.winner = null;
+        this.matchLogs = [];
+        this.log('⚔️ புதிய ஆட்டம் துவங்கியது! (New Match Started)');
+        if (this.onStateChange) this.onStateChange();
+    }
 
-    this.currentRoll = rollData;
-    this.hasRolled = true;
+    getCurrentPlayer() {
+        return this.players[this.currentTurnIndex];
+    }
 
-    const player = this.getCurrentPlayer();
-    const score = rollData.points;
+    log(msg) {
+        this.matchLogs.unshift(msg);
+        if (this.matchLogs.length > 20) this.matchLogs.pop();
+        if (this.onLogMessage) this.onLogMessage(msg);
+    }
 
-    const legalMoves = this.getLegalMoves(player, score);
+    // Called when 6 Chozhis are rolled
+    handleRollResult(rollData) {
+        if (this.isGameOver || this.hasRolled) return;
 
-    if (legalMoves.length === 0) {
-      const hasHomeCoins = player.coins.some((c) => c.status === "HOME");
-      const hasActiveCoins = player.coins.some((c) => c.status === "ACTIVE");
+        this.currentRoll = rollData;
+        this.hasRolled = true;
 
-      if (hasHomeCoins && !hasActiveCoins) {
-        if (this.onLogMessage) this.onLogMessage("NEED_1_OR_5");
-      } else {
-        if (this.onLogMessage) this.onLogMessage("NO_MOVES");
-      }
+        const player = this.getCurrentPlayer();
+        const score = rollData.points;
 
-      const hasBonus = this.isBonusRoll(score);
-      setTimeout(() => {
-        if (hasBonus) {
-          if (this.onLogMessage) this.onLogMessage("BONUS_ROLL");
-          this.hasRolled = false;
-          this.currentRoll = null;
-          if (this.onStateChange) this.onStateChange();
-          if (player.isAI) this.triggerAIMove();
+        this.log(`🎲 ${player.name} சோழி உருட்டினார்: ${score} புள்ளிகள்! (${rollData.upCount} வாய்)`);
+
+        // Find legal moves for current player
+        const legalMoves = this.getLegalMoves(player, score);
+
+        if (legalMoves.length === 0) {
+            this.log(`⚠️ நகர்த்த வழியில்லை! (No moves available for ${player.name})`);
+            // Check if player gets a bonus roll despite no moves
+            const hasBonusRoll = (score === 1 || score === 6 || score === 12);
+            setTimeout(() => {
+                if (hasBonusRoll) {
+                    this.log(`🌟 கூடுதல் வாய்ப்பு! (Bonus Roll Awarded to ${player.name})`);
+                    this.hasRolled = false;
+                    this.currentRoll = null;
+                    if (this.onStateChange) this.onStateChange();
+                    if (player.isAI) this.triggerAIMove();
+                } else {
+                    this.nextTurn();
+                }
+            }, 900);
+            return;
+        }
+
+        if (this.onMoveAvailable) {
+            this.onMoveAvailable(legalMoves);
+        }
+
+        // If current player is AI, execute best move automatically
+        if (player.isAI) {
+            setTimeout(() => {
+                const bestMove = this.chooseAIMove(legalMoves, score);
+                this.executeMove(bestMove.coin, score);
+            }, 800);
+        }
+    }
+
+    // Determine legal moves for a player given a roll score
+    getLegalMoves(player, score) {
+        const moves = [];
+        const path = this.playerPaths[player.id];
+        const canUnlock = (score === 1 || score === 5 || score === 6 || score === 12);
+
+        player.coins.forEach(coin => {
+            if (coin.status === 'CROWNED') return;
+
+            if (coin.status === 'HOME') {
+                if (canUnlock) {
+                    // Move from HOME to active start position (path step 0)
+                    const targetCoord = path[0];
+                    moves.push({
+                        coin: coin,
+                        type: 'UNLOCK',
+                        targetStep: 0,
+                        targetRow: targetCoord.r,
+                        targetCol: targetCoord.c,
+                        isCapture: this.checkCapture(player.id, targetCoord.r, targetCoord.c)
+                    });
+                }
+            } else if (coin.status === 'ACTIVE') {
+                const nextStep = coin.pathStep + score;
+                if (nextStep < path.length) {
+                    const targetCoord = path[nextStep];
+                    const isCenterGoal = (nextStep === path.length - 1);
+                    moves.push({
+                        coin: coin,
+                        type: isCenterGoal ? 'CROWN' : 'ADVANCE',
+                        targetStep: nextStep,
+                        targetRow: targetCoord.r,
+                        targetCol: targetCoord.c,
+                        isCapture: this.checkCapture(player.id, targetCoord.r, targetCoord.c)
+                    });
+                }
+            }
+        });
+
+        return moves;
+    }
+
+    // Check if moving to (row, col) will capture an enemy coin
+    checkCapture(myPlayerId, row, col) {
+        const key = `${row},${col}`;
+        if (this.safeTiles.has(key)) return null; // Safe house protects coins
+
+        // Look for any enemy coin stationed on this tile
+        for (const enemy of this.players) {
+            if (enemy.id === myPlayerId) continue;
+            for (const c of enemy.coins) {
+                if (c.status === 'ACTIVE' && c.row === row && c.col === col) {
+                    return c;
+                }
+            }
+        }
+        return null;
+    }
+
+    // AI Move Selection Heuristic
+    chooseAIMove(legalMoves, score) {
+        let bestMove = legalMoves[0];
+        let maxScore = -999;
+
+        legalMoves.forEach(move => {
+            let moveValue = 0;
+
+            // 1. Prioritize capturing enemy coins (Big bonus!)
+            if (move.isCapture) moveValue += 50;
+
+            // 2. Prioritize crowning coin at center
+            if (move.type === 'CROWN') moveValue += 40;
+
+            // 3. Prioritize unlocking from HOME
+            if (move.type === 'UNLOCK') moveValue += 25;
+
+            // 4. Moving to a safe house
+            const isSafe = this.safeTiles.has(`${move.targetRow},${move.targetCol}`);
+            if (isSafe) moveValue += 15;
+
+            // 5. Advancing further along path
+            moveValue += move.targetStep;
+
+            if (moveValue > maxScore) {
+                maxScore = moveValue;
+                bestMove = move;
+            }
+        });
+
+        return bestMove;
+    }
+
+    // Execute the chosen move
+    executeMove(coin, score) {
+        const player = this.players.find(p => p.id === coin.playerId);
+        const path = this.playerPaths[player.id];
+        const isUnlock = (coin.status === 'HOME');
+        const targetStep = isUnlock ? 0 : coin.pathStep + score;
+        const targetCoord = path[targetStep];
+        const isGoal = (targetStep === path.length - 1);
+
+        // Sub-path of coordinates for 3D hopping animation
+        const hopPath = [];
+        if (isUnlock) {
+            hopPath.push(path[0]);
         } else {
-          this.nextTurn();
+            for (let s = coin.pathStep + 1; s <= targetStep; s++) {
+                hopPath.push(path[s]);
+            }
         }
-      }, 850);
-      return;
-    }
 
-    if (this.onMoveAvailable) {
-      this.onMoveAvailable(legalMoves);
-    }
+        // Check for capture
+        const capturedEnemyCoin = this.checkCapture(player.id, targetCoord.r, targetCoord.c);
 
-    if (player.isAI) {
-      setTimeout(() => {
-        const bestMove = this.chooseAIMove(legalMoves, score);
-        this.executeMove(bestMove.coin, score, bestMove);
-      }, 700);
-    }
-  }
+        // Update coin logical state
+        coin.status = isGoal ? 'CROWNED' : 'ACTIVE';
+        coin.pathStep = targetStep;
+        coin.row = targetCoord.r;
+        coin.col = targetCoord.c;
 
-  getLegalMoves(player, score) {
-    const moves = [];
-    const tracks = this.playerTracks[player.side];
-    const canUnlock = this.isUnlockRoll(score);
-    const hasCut = player.hasCutOpponent;
-
-    player.coins.forEach((coin) => {
-      if (coin.status === "CROWNED") return;
-
-      if (coin.status === "HOME") {
-        if (canUnlock) {
-          const startCoord = tracks.outer[0];
-          const cap = this.checkCapture(player.id, startCoord.r, startCoord.c);
-          moves.push({
-            coin: coin,
-            type: "UNLOCK",
-            destTrack: "OUTER",
-            destStep: 0,
-            destCoord: startCoord,
-            hopCoords: [startCoord],
-            isCapture: cap,
-          });
+        if (isGoal) {
+            player.crownedCount++;
+            this.log(`🏆 ${player.name} காய் சூரிய சக்கரத்தில் பழமானது! (Coin Crowned at Center: ${player.crownedCount}/4)`);
+        } else if (isUnlock) {
+            this.log(`🚀 ${player.name} காய் களம் புகுந்தது! (Coin Entered Board)`);
+        } else {
+            this.log(`♟️ ${player.name} காய் நகர்ந்தது (${score} கட்டங்கள்)`);
         }
-      } else if (coin.status === "ACTIVE") {
-        const sim = this.simulatePathAdvance(player, coin, score, hasCut);
-        if (sim) {
-          moves.push(sim);
+
+        // Handle Capture
+        if (capturedEnemyCoin) {
+            const enemyPlayer = this.players.find(p => p.id === capturedEnemyCoin.playerId);
+            capturedEnemyCoin.status = 'HOME';
+            capturedEnemyCoin.pathStep = -1;
+            capturedEnemyCoin.row = enemyPlayer.startPos.row;
+            capturedEnemyCoin.col = enemyPlayer.startPos.col;
+            this.log(`⚔️ வெட்டு! ${player.name} -> ${enemyPlayer.name} காயை வெட்டினார்! (Enemy Captured!)`);
+            if (this.onCapture) this.onCapture(capturedEnemyCoin);
         }
-      }
-    });
 
-    return moves;
-  }
-
-  simulatePathAdvance(player, coin, score, hasCut) {
-    const tracks = this.playerTracks[player.side];
-    const N = this.gridSize;
-
-    let curTrack = coin.track;
-    let curStep = coin.trackStep;
-    let rem = score;
-    const hopCoords = [];
-
-    if (N === 5) {
-      while (rem > 0) {
-        if (curTrack === "OUTER") {
-          if (curStep + rem < tracks.outer.length) {
-            for (let s = curStep + 1; s <= curStep + rem; s++) {
-              hopCoords.push(tracks.outer[s]);
-            }
-            curStep += rem;
-            rem = 0;
-          } else {
-            const stepsToEnd = tracks.outer.length - 1 - curStep;
-            for (let s = curStep + 1; s < tracks.outer.length; s++) {
-              hopCoords.push(tracks.outer[s]);
-            }
-            rem -= stepsToEnd + 1;
-
-            if (hasCut) {
-              curTrack = "INNER";
-              curStep = 0;
-              hopCoords.push(tracks.inner[0]);
-            } else {
-              curTrack = "OUTER";
-              curStep = 0;
-              hopCoords.push(tracks.outer[0]);
-            }
-          }
-        } else if (curTrack === "INNER") {
-          if (curStep + rem < tracks.inner.length) {
-            for (let s = curStep + 1; s <= curStep + rem; s++) {
-              hopCoords.push(tracks.inner[s]);
-            }
-            curStep += rem;
-            rem = 0;
-          } else {
-            const stepsToEnd = tracks.inner.length - 1 - curStep;
-            for (let s = curStep + 1; s < tracks.inner.length; s++) {
-              hopCoords.push(tracks.inner[s]);
-            }
-            rem -= stepsToEnd + 1;
-
-            curTrack = "CENTER";
-            curStep = 0;
-            hopCoords.push(tracks.center[0]);
-            rem = 0;
-          }
-        } else if (curTrack === "CENTER") {
-          return null;
+        // Trigger 3D movement in scene
+        if (this.onCoinMoved) {
+            this.onCoinMoved({
+                coin: coin,
+                hopPath: hopPath,
+                capturedCoin: capturedEnemyCoin,
+                isGoal: isGoal,
+                onComplete: () => {
+                    this.afterMoveComplete(player, score, capturedEnemyCoin, isGoal);
+                }
+            });
+        } else {
+            this.afterMoveComplete(player, score, capturedEnemyCoin, isGoal);
         }
-      }
-    } else {
-      // 7x7 tracks
-      while (rem > 0) {
-        if (curTrack === "OUTER") {
-          if (curStep + rem < tracks.outer.length) {
-            for (let s = curStep + 1; s <= curStep + rem; s++) {
-              hopCoords.push(tracks.outer[s]);
-            }
-            curStep += rem;
-            rem = 0;
-          } else {
-            const stepsToEnd = tracks.outer.length - 1 - curStep;
-            for (let s = curStep + 1; s < tracks.outer.length; s++) {
-              hopCoords.push(tracks.outer[s]);
-            }
-            rem -= stepsToEnd + 1;
+    }
 
-            if (hasCut) {
-              curTrack = "MIDDLE";
-              curStep = 0;
-              hopCoords.push(tracks.middle[0]);
-            } else {
-              curTrack = "OUTER";
-              curStep = 0;
-              hopCoords.push(tracks.outer[0]);
-            }
-          }
-        } else if (curTrack === "MIDDLE") {
-          if (curStep + rem < tracks.middle.length) {
-            for (let s = curStep + 1; s <= curStep + rem; s++) {
-              hopCoords.push(tracks.middle[s]);
-            }
-            curStep += rem;
-            rem = 0;
-          } else {
-            const stepsToEnd = tracks.middle.length - 1 - curStep;
-            for (let s = curStep + 1; s < tracks.middle.length; s++) {
-              hopCoords.push(tracks.middle[s]);
-            }
-            rem -= stepsToEnd + 1;
-
-            curTrack = "INNER";
-            curStep = 0;
-            hopCoords.push(tracks.inner[0]);
-          }
-        } else if (curTrack === "INNER") {
-          if (curStep + rem < tracks.inner.length) {
-            for (let s = curStep + 1; s <= curStep + rem; s++) {
-              hopCoords.push(tracks.inner[s]);
-            }
-            curStep += rem;
-            rem = 0;
-          } else {
-            const stepsToEnd = tracks.inner.length - 1 - curStep;
-            for (let s = curStep + 1; s < tracks.inner.length; s++) {
-              hopCoords.push(tracks.inner[s]);
-            }
-            rem -= stepsToEnd + 1;
-
-            curTrack = "CENTER";
-            curStep = 0;
-            hopCoords.push(tracks.center[0]);
-            rem = 0;
-          }
-        } else if (curTrack === "CENTER") {
-          return null;
+    // Called after 3D animation finishes
+    afterMoveComplete(player, score, capturedEnemyCoin, isGoal) {
+        // Check for Game Over (all 4 coins crowned)
+        if (player.crownedCount >= 4) {
+            this.isGameOver = true;
+            this.winner = player;
+            this.log(`🎉 வெற்றி! ${player.name} ஆட்டத்தில் வாகை சூடினார்! (VICTORY!)`);
+            if (this.onGameOver) this.onGameOver(player);
+            if (this.onStateChange) this.onStateChange();
+            return;
         }
-      }
-    }
 
-    const destCoord = hopCoords[hopCoords.length - 1];
-    const isGoal = curTrack === "CENTER";
-    const cap = isGoal
-      ? null
-      : this.checkCapture(player.id, destCoord.r, destCoord.c);
+        // Determine if player gets a bonus roll
+        // Bonus roll condition: Rolled 1 (Daayam), 6, 12, or captured an opponent
+        const getsBonus = (score === 1 || score === 6 || score === 12 || capturedEnemyCoin !== null);
 
-    return {
-      coin: coin,
-      type: isGoal ? "CROWN" : "ADVANCE",
-      destTrack: curTrack,
-      destStep: curStep,
-      destCoord: destCoord,
-      hopCoords: hopCoords,
-      isCapture: cap,
-    };
-  }
+        if (getsBonus) {
+            this.log(`🌟 கூடுதல் உருட்டல் வாய்ப்பு! (Bonus Roll Awarded to ${player.name})`);
+            this.hasRolled = false;
+            this.currentRoll = null;
+            if (this.onStateChange) this.onStateChange();
 
-  checkCapture(myPlayerId, row, col) {
-    const key = `${row},${col}`;
-    if (this.safeTiles.has(key)) return null;
-
-    for (const enemy of this.players) {
-      if (enemy.id === myPlayerId) continue;
-      for (const c of enemy.coins) {
-        if (c.status === "ACTIVE" && c.row === row && c.col === col) {
-          return c;
+            if (player.isAI) {
+                setTimeout(() => this.triggerAIMove(), 700);
+            }
+        } else {
+            this.nextTurn();
         }
-      }
-    }
-    return null;
-  }
-
-  chooseAIMove(legalMoves, score) {
-    let bestMove = legalMoves[0];
-    let maxScore = -999;
-
-    legalMoves.forEach((move) => {
-      let val = 0;
-
-      if (move.isCapture) {
-        val += 60;
-        const player = this.players.find((p) => p.id === move.coin.playerId);
-        if (player && !player.hasCutOpponent) val += 40;
-      }
-
-      if (move.type === "CROWN") val += 50;
-      if (move.destTrack === "INNER" || move.destTrack === "MIDDLE") val += 30;
-      if (this.safeTiles.has(`${move.destCoord.r},${move.destCoord.c}`))
-        val += 15;
-      if (move.type === "UNLOCK") val += 20;
-
-      val += move.destStep;
-
-      if (val > maxScore) {
-        maxScore = val;
-        bestMove = move;
-      }
-    });
-
-    return bestMove;
-  }
-
-  executeMove(coin, score, chosenMove = null) {
-    const player = this.players.find((p) => p.id === coin.playerId);
-    const move =
-      chosenMove ||
-      this.getLegalMoves(player, score).find((m) => m.coin.id === coin.id);
-
-    if (!move) return;
-
-    const isUnlock = move.type === "UNLOCK";
-    const isGoal = move.type === "CROWN";
-    const targetCoord = move.destCoord;
-    const capturedEnemy = move.isCapture;
-
-    coin.status = isGoal ? "CROWNED" : "ACTIVE";
-    coin.track = move.destTrack;
-    coin.trackStep = move.destStep;
-    coin.row = targetCoord.r;
-    coin.col = targetCoord.c;
-
-    if (isGoal) {
-      player.crownedCount++;
     }
 
-    if (capturedEnemy) {
-      const enemyPlayer = this.players.find(
-        (p) => p.id === capturedEnemy.playerId,
-      );
-      capturedEnemy.status = "HOME";
-      capturedEnemy.track = "OUTER";
-      capturedEnemy.trackStep = -1;
-      capturedEnemy.row = enemyPlayer.startPos.row;
-      capturedEnemy.col = enemyPlayer.startPos.col;
+    nextTurn() {
+        this.hasRolled = false;
+        this.currentRoll = null;
+        this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
 
-      player.hasCutOpponent = true;
+        const nextPlayer = this.getCurrentPlayer();
+        this.log(`👉 அடுத்த முறை: ${nextPlayer.name}`);
 
-      if (this.onCapture) this.onCapture(capturedEnemy);
+        if (this.onStateChange) this.onStateChange();
+
+        // If next player is AI, automatically roll
+        if (nextPlayer.isAI && !this.isGameOver) {
+            setTimeout(() => this.triggerAIMove(), 800);
+        }
     }
 
-    if (this.onCoinMoved) {
-      this.onCoinMoved({
-        coin: coin,
-        hopPath: move.hopCoords,
-        capturedCoin: capturedEnemy,
-        isGoal: isGoal,
-        isUnlock: isUnlock,
-        onComplete: () => {
-          this.afterMoveComplete(player, score, capturedEnemy, isGoal);
-        },
-      });
-    } else {
-      this.afterMoveComplete(player, score, capturedEnemy, isGoal);
+    triggerAIMove() {
+        if (this.isGameOver) return;
+        if (window.chakaramScene) {
+            window.chakaramScene.rollChozhi();
+        }
     }
-  }
-
-  afterMoveComplete(player, score, capturedEnemy, isGoal) {
-    if (player.crownedCount >= 4) {
-      this.isGameOver = true;
-      this.winner = player;
-      if (this.onGameOver) this.onGameOver(player);
-      if (this.onStateChange) this.onStateChange();
-      return;
-    }
-
-    const hasBonus = this.isBonusRoll(score) || capturedEnemy !== null;
-
-    if (hasBonus) {
-      this.hasRolled = false;
-      this.currentRoll = null;
-      if (this.onStateChange) this.onStateChange();
-
-      if (player.isAI) {
-        setTimeout(() => this.triggerAIMove(), 700);
-      }
-    } else {
-      this.nextTurn();
-    }
-  }
-
-  nextTurn() {
-    this.hasRolled = false;
-    this.currentRoll = null;
-    this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
-
-    const nextPlayer = this.getCurrentPlayer();
-    if (this.onStateChange) this.onStateChange();
-
-    if (nextPlayer.isAI && !this.isGameOver) {
-      setTimeout(() => this.triggerAIMove(), 750);
-    }
-  }
-
-  triggerAIMove() {
-    if (this.isGameOver) return;
-    if (window.chakaramScene) {
-      window.chakaramScene.rollChozhi();
-    }
-  }
 }
 
 window.ChakaramGameEngine = ChakaramGameEngine;

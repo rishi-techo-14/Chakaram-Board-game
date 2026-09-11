@@ -1,552 +1,605 @@
 /**
- * Procedural Texture Generator for Chakaram (Chowka Bara)
- * Faithfully matches authentic handcrafted wooden board in Image 1:
- * - Light natural birchwood with subtle organic woodgrain
- * - Clean, thin black grid lines
- * - 4 Midpoint Safe Houses: Authentic 4-petal floral circle emblems (as seen in Image 1)
- * - Center Goal: Intricate circular mandala / lotus rosette emblem (as seen in Image 1)
- * - Carved hardwood resting yard bases with indented coin slots
- * - Realistic UV-Mapped Cowrie Shell (சோழி / Chozhi) Texture
- * - Lathe-turned hardwood textures (Teak, Rosewood, Sandalwood, Red Cedar)
+ * Procedural Texture Generator for Ancient Tamil Nadu Heritage Aesthetics
+ * Generates:
+ * - Turned Hardwood Grain Textures for Traditional Game Pawns / Coins (மரக் காய்கள்)
+ * - Ultra-Realistic Cowrie Shell (சோழி / Chozhi) Complete UV-Mapped Skin
+ * - Refined, elegant antique gold engraved stone textures
+ * - Inlaid Rice-Flour Kolam (கோலம்) Floor
+ * - Ancient Black Granite (கருங்கல்), Sandstone, Chola Bronze, Terracotta materials
  */
 
 class ProceduralTextures {
-  // 1. Turned Hardwood Grain Texture for 3D Game Pawns / Coins
-  static createWoodTexture(woodColorType = "teak", width = 512, height = 512) {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
+    // 1. Turned Hardwood Grain Texture for 3D Game Pawns / Coins (மரக் காய்கள்)
+    static createWoodTexture(woodColorType = 'teak', width = 512, height = 512) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
 
-    let baseColor = "#b57642";
-    let grainColor = "#7a421c";
-    let ringColor = "rgba(70, 32, 10, 0.25)";
+        let baseColor = '#b57642';
+        let grainColor = '#7a421c';
+        let ringColor = 'rgba(70, 32, 10, 0.25)';
 
-    if (woodColorType === "rosewood") {
-      baseColor = "#4a2313";
-      grainColor = "#240d05";
-      ringColor = "rgba(25, 8, 3, 0.45)";
-    } else if (woodColorType === "sandalwood") {
-      baseColor = "#d9b177";
-      grainColor = "#a37943";
-      ringColor = "rgba(110, 75, 30, 0.2)";
-    } else if (woodColorType === "cedar") {
-      baseColor = "#8a3420";
-      grainColor = "#4a150a";
-      ringColor = "rgba(45, 10, 5, 0.35)";
+        if (woodColorType === 'rosewood') {
+            baseColor = '#542817';
+            grainColor = '#2b0f06';
+            ringColor = 'rgba(25, 8, 3, 0.4)';
+        } else if (woodColorType === 'sandalwood') {
+            baseColor = '#d9b177';
+            grainColor = '#9e733e';
+            ringColor = 'rgba(110, 75, 30, 0.2)';
+        } else if (woodColorType === 'cedar') {
+            baseColor = '#8a3420';
+            grainColor = '#4a150a';
+            ringColor = 'rgba(45, 10, 5, 0.35)';
+        }
+
+        ctx.fillStyle = baseColor;
+        ctx.fillRect(0, 0, width, height);
+
+        // Longitudinal woodgrain fibers
+        for (let y = 0; y < height; y += 3) {
+            ctx.fillStyle = grainColor;
+            ctx.globalAlpha = 0.15 + Math.sin(y * 0.08) * 0.1;
+            ctx.fillRect(0, y, width, 2);
+        }
+
+        // Annual rings & subtle wavy grain lines
+        ctx.globalAlpha = 0.35;
+        for (let i = 0; i < 40; i++) {
+            ctx.beginPath();
+            const yStart = Math.random() * height;
+            ctx.moveTo(0, yStart);
+            ctx.bezierCurveTo(
+                width * 0.33, yStart + (Math.random() - 0.5) * 40,
+                width * 0.66, yStart + (Math.random() - 0.5) * 40,
+                width, yStart + (Math.random() - 0.5) * 20
+            );
+            ctx.strokeStyle = ringColor;
+            ctx.lineWidth = 2 + Math.random() * 3;
+            ctx.stroke();
+        }
+
+        // Lathe turning micro-rings (horizontal sheen from woodturning)
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = '#ffffff';
+        for (let ly = 10; ly < height; ly += 25) {
+            ctx.fillRect(0, ly, width, 3);
+        }
+
+        ctx.globalAlpha = 1.0;
+        return canvas;
     }
 
-    ctx.fillStyle = baseColor;
-    ctx.fillRect(0, 0, width, height);
+    // 2. Ancient Stone / Granite / Terracotta Texture
+    static createGraniteTexture(width = 512, height = 512, stoneType = 'granite') {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
 
-    for (let y = 0; y < height; y += 3) {
-      ctx.fillStyle = grainColor;
-      ctx.globalAlpha = 0.15 + Math.sin(y * 0.08) * 0.1;
-      ctx.fillRect(0, y, width, 2);
+        let baseColor = '#181512';
+        if (stoneType === 'sandstone') baseColor = '#945c38';
+        else if (stoneType === 'bronze') baseColor = '#382b18';
+        else if (stoneType === 'terracotta') baseColor = '#7a3118';
+
+        ctx.fillStyle = baseColor;
+        ctx.fillRect(0, 0, width, height);
+
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+            const noise = (Math.random() - 0.5) * 35;
+            data[i] = Math.min(255, Math.max(0, data[i] + noise));
+            data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+            data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.lineWidth = 1.2;
+        for (let j = 0; j < 25; j++) {
+            ctx.beginPath();
+            const sx = Math.random() * width;
+            const sy = Math.random() * height;
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + (Math.random() - 0.5) * 45, sy + (Math.random() - 0.5) * 45);
+            ctx.stroke();
+        }
+
+        return canvas;
     }
 
-    ctx.globalAlpha = 0.35;
-    for (let i = 0; i < 40; i++) {
-      ctx.beginPath();
-      const yStart = Math.random() * height;
-      ctx.moveTo(0, yStart);
-      ctx.bezierCurveTo(
-        width * 0.33,
-        yStart + (Math.random() - 0.5) * 40,
-        width * 0.66,
-        yStart + (Math.random() - 0.5) * 40,
-        width,
-        yStart + (Math.random() - 0.5) * 20,
-      );
-      ctx.strokeStyle = ringColor;
-      ctx.lineWidth = 2 + Math.random() * 3;
-      ctx.stroke();
-    }
+    // 3. Temple Floor with Inlaid White Rice-Flour Kolam (கோலம்)
+    static createKolamFloorTexture(size = 1024) {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
 
-    ctx.globalAlpha = 0.12;
-    ctx.fillStyle = "#ffffff";
-    for (let ly = 10; ly < height; ly += 25) {
-      ctx.fillRect(0, ly, width, 3);
-    }
+        ctx.fillStyle = '#141210';
+        ctx.fillRect(0, 0, size, size);
 
-    ctx.globalAlpha = 1.0;
-    return canvas;
-  }
+        ctx.strokeStyle = '#080706';
+        ctx.lineWidth = 4;
+        const tileSize = size / 4;
+        for (let x = 0; x <= size; x += tileSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, size);
+            ctx.stroke();
+        }
+        for (let y = 0; y <= size; y += tileSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(size, y);
+            ctx.stroke();
+        }
 
-  // 2. Authentic Light Natural Birch/Pine or Custom Wood Board Texture (Matching Image 1)
-  static createNaturalBoardWoodTexture(
-    theme = "birch",
-    width = 1024,
-    height = 1024,
-  ) {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
+        const cx = size / 2;
+        const cy = size / 2;
 
-    const grad = ctx.createLinearGradient(0, 0, width, height);
+        ctx.strokeStyle = 'rgba(255, 250, 235, 0.85)';
+        ctx.fillStyle = 'rgba(255, 250, 235, 0.9)';
+        ctx.lineWidth = 4.0;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
-    let fiberColor = "rgba(175, 140, 95, 0.08)";
-    let waveColor = "rgba(160, 125, 80, 0.14)";
+        ctx.strokeRect(cx - 400, cy - 400, 800, 800);
+        ctx.strokeRect(cx - 420, cy - 420, 840, 840);
 
-    if (theme === "teak") {
-      grad.addColorStop(0, "#d29656");
-      grad.addColorStop(0.3, "#dfaa6c");
-      grad.addColorStop(0.7, "#cc8e4c");
-      grad.addColorStop(1, "#b87c3d");
-      fiberColor = "rgba(110, 60, 20, 0.12)";
-      waveColor = "rgba(90, 45, 15, 0.22)";
-    } else if (theme === "rosewood") {
-      grad.addColorStop(0, "#5a3020");
-      grad.addColorStop(0.3, "#6e3c28");
-      grad.addColorStop(0.7, "#522919");
-      grad.addColorStop(1, "#441e10");
-      fiberColor = "rgba(25, 10, 5, 0.25)";
-      waveColor = "rgba(20, 8, 4, 0.35)";
-    } else if (theme === "sandalwood") {
-      grad.addColorStop(0, "#f0d8ae");
-      grad.addColorStop(0.3, "#f7e4c2");
-      grad.addColorStop(0.7, "#ecd0a4");
-      grad.addColorStop(1, "#e2be8f");
-      fiberColor = "rgba(150, 115, 70, 0.08)";
-      waveColor = "rgba(140, 100, 55, 0.15)";
-    } else {
-      // Default 'birch' (Matching Image 1)
-      grad.addColorStop(0, "#ebd8be");
-      grad.addColorStop(0.3, "#f2e2cb");
-      grad.addColorStop(0.7, "#ebd5b8");
-      grad.addColorStop(1, "#e5cca8");
-      fiberColor = "rgba(175, 140, 95, 0.08)";
-      waveColor = "rgba(160, 125, 80, 0.14)";
-    }
+        const petals = 16;
+        for (let p = 0; p < petals; p++) {
+            const angle = (p * Math.PI * 2) / petals;
+            const rInner = 200;
+            const rOuter = 360;
 
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, width, height);
+            const x1 = cx + Math.cos(angle) * rInner;
+            const y1 = cy + Math.sin(angle) * rInner;
+            const x2 = cx + Math.cos(angle + Math.PI / petals) * rOuter;
+            const y2 = cy + Math.sin(angle + Math.PI / petals) * rOuter;
+            const x3 = cx + Math.cos(angle + (Math.PI * 2) / petals) * rInner;
+            const y3 = cy + Math.sin(angle + (Math.PI * 2) / petals) * rInner;
 
-    // Subtle longitudinal fine wood fibers
-    ctx.fillStyle = fiberColor;
-    for (let x = 0; x < width; x += 2) {
-      if (Math.random() > 0.4) {
-        ctx.fillRect(x, 0, 1.5, height);
-      }
-    }
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.quadraticCurveTo(x2, y2, x3, y3);
+            ctx.stroke();
 
-    // Soft organic woodgrain waves
-    ctx.strokeStyle = waveColor;
-    ctx.lineWidth = 3;
-    for (let i = 0; i < 30; i++) {
-      const sx = Math.random() * width;
-      ctx.beginPath();
-      ctx.moveTo(sx, 0);
-      ctx.bezierCurveTo(
-        sx + (Math.random() - 0.5) * 80,
-        height * 0.33,
-        sx + (Math.random() - 0.5) * 80,
-        height * 0.66,
-        sx + (Math.random() - 0.5) * 40,
-        height,
-      );
-      ctx.stroke();
-    }
+            const bx = cx + Math.cos(angle + Math.PI / petals) * (rOuter + 25);
+            const by = cy + Math.sin(angle + Math.PI / petals) * (rOuter + 25);
+            ctx.beginPath();
+            ctx.arc(bx, by, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
-    return canvas;
-  }
-
-  // Traditional South Indian Pulli Kolam Floor Texture
-  static createKolamFloorTexture(size = 1024) {
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d");
-
-    // Warm Terracotta Red Base
-    ctx.fillStyle = "#8a3c2a";
-    ctx.fillRect(0, 0, size, size);
-
-    // Subtle tile seams
-    ctx.strokeStyle = "rgba(70, 24, 15, 0.4)";
-    ctx.lineWidth = 3;
-    const tileSize = size / 4;
-    for (let x = 0; x <= size; x += tileSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, size);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= size; y += tileSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(size, y);
-      ctx.stroke();
-    }
-
-    const cx = size / 2;
-    const cy = size / 2;
-
-    ctx.strokeStyle = "rgba(255, 252, 244, 0.88)";
-    ctx.fillStyle = "rgba(255, 252, 244, 0.92)";
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    // Outer Kolam Borders
-    ctx.strokeRect(cx - 420, cy - 420, 840, 840);
-    ctx.strokeRect(cx - 435, cy - 435, 870, 870);
-
-    // 16 Petal Lotus / Sikku curves
-    const petals = 16;
-    for (let p = 0; p < petals; p++) {
-      const angle = (p * Math.PI * 2) / petals;
-      const rInner = 240;
-      const rOuter = 400;
-
-      const x1 = cx + Math.cos(angle) * rInner;
-      const y1 = cy + Math.sin(angle) * rInner;
-      const x2 = cx + Math.cos(angle + Math.PI / petals) * rOuter;
-      const y2 = cy + Math.sin(angle + Math.PI / petals) * rOuter;
-      const x3 = cx + Math.cos(angle + (Math.PI * 2) / petals) * rInner;
-      const y3 = cy + Math.sin(angle + (Math.PI * 2) / petals) * rInner;
-
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.quadraticCurveTo(x2, y2, x3, y3);
-      ctx.stroke();
-    }
-
-    // Pulli (Dot matrix) in concentric mandala
-    const dotRings = [120, 200, 280, 360];
-    dotRings.forEach((r) => {
-      const count = Math.floor((r * Math.PI * 2) / 36);
-      for (let i = 0; i < count; i++) {
-        const a = (i * Math.PI * 2) / count;
         ctx.beginPath();
-        ctx.arc(
-          cx + Math.cos(a) * r,
-          cy + Math.sin(a) * r,
-          3.2,
-          0,
-          Math.PI * 2,
-        );
+        ctx.arc(cx, cy, 160, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, 100, 0, Math.PI * 2);
+        ctx.stroke();
+
+        for (let k = 0; k < 8; k++) {
+            const a = (k * Math.PI * 2) / 8;
+            ctx.beginPath();
+            ctx.arc(cx + Math.cos(a) * 65, cy + Math.sin(a) * 65, 20, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        for (let px = -3; px <= 3; px++) {
+            for (let py = -3; py <= 3; py++) {
+                ctx.beginPath();
+                ctx.arc(cx + px * 40, cy + py * 40, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        return canvas;
+    }
+
+    // 4. COMPLETE UV-MAPPED TEXTURE FOR SOLID COWRIE SHELL
+    static createCompleteChozhiTexture(width = 1024, height = 512) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#f8f5ee';
+        ctx.fillRect(0, 0, width, height);
+
+        // --- TOP HALF: DORSAL BACK (முதுகு) ---
+        const topH = height / 2;
+        const cx = width / 2;
+        const cyTop = topH / 2;
+
+        const dorsalGrad = ctx.createRadialGradient(cx, cyTop, 30, cx, cyTop, 380);
+        dorsalGrad.addColorStop(0, '#fdfbf5');
+        dorsalGrad.addColorStop(0.3, '#f5efdc');
+        dorsalGrad.addColorStop(0.65, '#e5d7ba');
+        dorsalGrad.addColorStop(0.85, '#d4c2a0');
+        dorsalGrad.addColorStop(1, '#c5b08c');
+        ctx.fillStyle = dorsalGrad;
+        ctx.fillRect(0, 0, width, topH);
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.lineWidth = 18;
+        ctx.beginPath();
+        ctx.ellipse(cx, cyTop - 25, 220, 70, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // --- BOTTOM HALF: VENTRAL MOUTH (வாய்) ---
+        const cyBot = topH + topH / 2;
+
+        const ventralGrad = ctx.createRadialGradient(cx, cyBot, 40, cx, cyBot, 380);
+        ventralGrad.addColorStop(0, '#faf7ee');
+        ventralGrad.addColorStop(0.6, '#ede4d4');
+        ventralGrad.addColorStop(1, '#d8cbb5');
+        ctx.fillStyle = ventralGrad;
+        ctx.fillRect(0, topH, width, topH);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(80, cyBot);
+        ctx.bezierCurveTo(width * 0.35, cyBot - 18, width * 0.65, cyBot + 18, width - 80, cyBot);
+        ctx.strokeStyle = '#2b1b10';
+        ctx.lineWidth = 24;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        ctx.strokeStyle = '#0d0704';
+        ctx.lineWidth = 10;
+        ctx.stroke();
+        ctx.restore();
+
+        const teethCount = 26;
+        const startX = 120;
+        const endX = width - 120;
+        const step = (endX - startX) / teethCount;
+
+        for (let i = 0; i <= teethCount; i++) {
+            const x = startX + i * step;
+            const curveOffset = Math.sin((i / teethCount) * Math.PI);
+            const toothLength = 55 * curveOffset + 14;
+
+            ctx.beginPath();
+            ctx.moveTo(x, cyBot - 6);
+            ctx.lineTo(x + (Math.random() - 0.5) * 3, cyBot - 6 - toothLength);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 7.0;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x + 3, cyBot - 6);
+            ctx.lineTo(x + 3, cyBot - 6 - toothLength);
+            ctx.strokeStyle = 'rgba(165, 135, 100, 0.5)';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x, cyBot + 6);
+            ctx.lineTo(x + (Math.random() - 0.5) * 3, cyBot + 6 + toothLength);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 7.0;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x + 3, cyBot + 6);
+            ctx.lineTo(x + 3, cyBot + 6 + toothLength);
+            ctx.strokeStyle = 'rgba(165, 135, 100, 0.5)';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = '#bda88e';
+        ctx.beginPath();
+        ctx.arc(75, cyBot, 24, 0, Math.PI * 2);
+        ctx.arc(width - 75, cyBot, 24, 0, Math.PI * 2);
         ctx.fill();
-      }
-    });
 
-    return canvas;
-  }
-
-  // 3. COMPLETE AUTHENTIC BOARD TILE TEXTURE (Matching Image 1)
-  static createTileTexture(
-    row,
-    col,
-    gridSize = 5,
-    isSelected = false,
-    isSafeHouse = false,
-    isCenter = false,
-    isStart = false,
-    boardTheme = "birch",
-  ) {
-    const size = 512;
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d");
-
-    // Draw natural wood base
-    const woodBase = this.createNaturalBoardWoodTexture(boardTheme, size, size);
-    ctx.drawImage(woodBase, 0, 0);
-
-    const cx = size / 2;
-    const cy = size / 2;
-
-    // Thin, crisp black grid border line (as seen in Image 1)
-    ctx.strokeStyle = isSelected ? "#d4af37" : "#221c17";
-    ctx.lineWidth = isSelected ? 8 : 3.5;
-    if (isSelected) {
-      ctx.shadowColor = "rgba(212, 175, 55, 0.8)";
-      ctx.shadowBlur = 10;
-    }
-    ctx.strokeRect(3, 3, size - 6, size - 6);
-    ctx.shadowBlur = 0;
-
-    if (isCenter) {
-      // Center Goal: Intricate circular rosette / mandala (as seen in Image 1)
-      this.drawCenterMandala(ctx, cx, cy);
-    } else if (isSafeHouse) {
-      // Midpoint Safe House: 4-petal floral circle emblem (as seen in Image 1)
-      this.drawMidpointFlowerEmblem(ctx, cx, cy);
+        return canvas;
     }
 
-    return canvas;
-  }
+    // 5. 5x5 MATRIX CELL TEXTURE (Refined Antique Gold Inlay)
+    static createTileTexture(row, col, isSelected = false, stoneTheme = 'granite') {
+        const size = 1024;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
 
-  // Authentic 4-Petal Floral Circle Emblem (Matching Image 1 Midpoint Safe Houses)
-  static drawMidpointFlowerEmblem(ctx, cx, cy) {
-    ctx.save();
+        const baseGranite = this.createGraniteTexture(size, size, stoneTheme);
+        ctx.drawImage(baseGranite, 0, 0);
 
-    // Elegant slate-blue / charcoal engraving color matching Image 1
-    const emblemColor = "#5e7284";
-    const emblemFill = "rgba(94, 114, 132, 0.38)";
+        const cx = size / 2;
+        const cy = size / 2;
 
-    const outerR = 175;
+        const borderWidth = 38;
+        ctx.lineWidth = isSelected ? 12 : 7;
+        ctx.strokeStyle = isSelected ? '#ffd700' : 'rgba(218, 178, 65, 0.85)';
+        ctx.shadowColor = isSelected ? 'rgba(255, 215, 0, 0.6)' : 'rgba(0, 0, 0, 0.6)';
+        ctx.shadowBlur = isSelected ? 14 : 4;
+        ctx.strokeRect(borderWidth, borderWidth, size - borderWidth * 2, size - borderWidth * 2);
 
-    // Outer crisp circle
-    ctx.strokeStyle = emblemColor;
-    ctx.lineWidth = 4.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-    ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.strokeRect(borderWidth + 14, borderWidth + 14, size - (borderWidth + 14) * 2, size - (borderWidth + 14) * 2);
 
-    // Inner concentric thin circle
-    ctx.lineWidth = 2.0;
-    ctx.beginPath();
-    ctx.arc(cx, cy, outerR - 18, 0, Math.PI * 2);
-    ctx.stroke();
+        const cornerOffset = borderWidth + 14;
+        const rosettes = [
+            [cornerOffset, cornerOffset],
+            [size - cornerOffset, cornerOffset],
+            [cornerOffset, size - cornerOffset],
+            [size - cornerOffset, size - cornerOffset]
+        ];
+        ctx.fillStyle = '#d8b04a';
+        rosettes.forEach(([rx, ry]) => {
+            ctx.beginPath();
+            ctx.arc(rx, ry, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
 
-    // Subtle hatched radial ring between circles
-    const hatchCount = 48;
-    for (let i = 0; i < hatchCount; i++) {
-      const angle = (i * Math.PI * 2) / hatchCount;
-      const x1 = cx + Math.cos(angle) * (outerR - 18);
-      const y1 = cy + Math.sin(angle) * (outerR - 18);
-      const x2 = cx + Math.cos(angle) * outerR;
-      const y2 = cy + Math.sin(angle) * outerR;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
+        const tamilNumerals = [
+            '௧', '௨', '௩', '௪', '௫',
+            '௬', '௭', '௮', '௯', '௰',
+            '௰௧', '௰௨', '௰௩', '௰௪', '௰௫',
+            '௰௬', '௰௭', '௰௮', '௰௯', '௨௰',
+            '௨௰௧', '௨௰௨', '௨௰௩', '௨௰௪', '௨௰௫'
+        ];
+
+        const index = row * 5 + col;
+        const isCenter = (row === 2 && col === 2);
+        const isCorner = (row === 0 || row === 4) && (col === 0 || col === 4);
+        const isEdgeMid = (row === 2 && (col === 0 || col === 4)) || (col === 2 && (row === 0 || row === 4));
+        const isSafeHouse = isCorner || isEdgeMid;
+
+        if (isCenter) {
+            this.drawCenterChakram(ctx, cx, cy, isSelected);
+        } else if (isSafeHouse) {
+            this.drawFortressEngraving(ctx, cx, cy, tamilNumerals[index], index + 1, isSelected);
+        } else {
+            this.drawStandardCell(ctx, cx, cy, tamilNumerals[index], index + 1, isSelected);
+        }
+
+        return canvas;
     }
 
-    // Center tiny ring
-    ctx.beginPath();
-    ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-    ctx.stroke();
+    static drawCenterChakram(ctx, cx, cy, isSelected) {
+        ctx.save();
 
-    // 4 Symmetrical Flower Petals along cardinal axes (Top, Bottom, Left, Right)
-    const petalAngles = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
-    const petalLen = 135;
-    const petalWidth = 36;
+        const radGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, 360);
+        radGrad.addColorStop(0, 'rgba(218, 175, 60, 0.4)');
+        radGrad.addColorStop(0.5, 'rgba(160, 110, 20, 0.25)');
+        radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = radGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 360, 0, Math.PI * 2);
+        ctx.fill();
 
-    petalAngles.forEach((angle) => {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(angle);
+        ctx.fillStyle = 'rgba(16, 12, 8, 0.7)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 330, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Petal shape (teardrop lobe)
-      ctx.beginPath();
-      ctx.moveTo(18, 0);
-      ctx.bezierCurveTo(
-        45,
-        -petalWidth,
-        petalLen - 20,
-        -petalWidth,
-        petalLen,
-        0,
-      );
-      ctx.bezierCurveTo(petalLen - 20, petalWidth, 45, petalWidth, 18, 0);
-      ctx.fillStyle = emblemFill;
-      ctx.fill();
-      ctx.strokeStyle = emblemColor;
-      ctx.lineWidth = 3.5;
-      ctx.stroke();
+        ctx.strokeStyle = isSelected ? '#ffd700' : '#d8b04a';
+        ctx.lineWidth = 10;
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 310, 0, Math.PI * 2);
+        ctx.stroke();
 
-      // Inner spine of petal
-      ctx.beginPath();
-      ctx.moveTo(22, 0);
-      ctx.lineTo(petalLen - 10, 0);
-      ctx.lineWidth = 2.0;
-      ctx.stroke();
+        ctx.strokeStyle = '#b8860b';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 275, 0, Math.PI * 2);
+        ctx.stroke();
 
-      // Small hatching on petal tips
-      ctx.beginPath();
-      ctx.moveTo(petalLen - 35, -12);
-      ctx.lineTo(petalLen - 35, 12);
-      ctx.moveTo(petalLen - 20, -8);
-      ctx.lineTo(petalLen - 20, 8);
-      ctx.stroke();
+        const spokes = 16;
+        for (let i = 0; i < spokes; i++) {
+            const angle = (i * Math.PI * 2) / spokes;
+            ctx.strokeStyle = '#e2be62';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(cx + Math.cos(angle) * 75, cy + Math.sin(angle) * 75);
+            ctx.lineTo(cx + Math.cos(angle) * 275, cy + Math.sin(angle) * 275);
+            ctx.stroke();
 
-      ctx.restore();
-    });
+            const tx = cx + Math.cos(angle + Math.PI / spokes) * 292;
+            const ty = cy + Math.sin(angle + Math.PI / spokes) * 292;
+            ctx.fillStyle = '#e8c978';
+            ctx.beginPath();
+            ctx.arc(tx, ty, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
-    ctx.restore();
-  }
+        ctx.fillStyle = '#d4af37';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 75, 0, Math.PI * 2);
+        ctx.fill();
 
-  // Intricate Circular Mandala / Rosette (Matching Image 1 Center Goal)
-  static drawCenterMandala(ctx, cx, cy) {
-    ctx.save();
+        ctx.fillStyle = '#1c150c';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 42, 0, Math.PI * 2);
+        ctx.fill();
 
-    const emblemColor = "#5e7284";
-    const emblemFill = "rgba(94, 114, 132, 0.42)";
+        ctx.fillStyle = '#e2be62';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+        ctx.fill();
 
-    // Outer scalloped mandala border
-    const outerR = 195;
-    ctx.strokeStyle = emblemColor;
-    ctx.lineWidth = 3.5;
+        ctx.font = 'bold 78px "Noto Sans Tamil", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
 
-    ctx.beginPath();
-    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
-    ctx.stroke();
+        ctx.fillStyle = '#000000';
+        ctx.fillText('சக்கரம்', cx + 3, cy + 383);
 
-    // Scalloped petal wreath
-    const petals = 24;
-    for (let p = 0; p < petals; p++) {
-      const a1 = (p * Math.PI * 2) / petals;
-      const a2 = ((p + 1) * Math.PI * 2) / petals;
-      const amid = (a1 + a2) / 2;
+        ctx.fillStyle = '#f0d388';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 4;
+        ctx.fillText('சக்கரம்', cx, cy + 380);
 
-      const x1 = cx + Math.cos(a1) * outerR;
-      const y1 = cy + Math.sin(a1) * outerR;
-      const x2 = cx + Math.cos(a2) * outerR;
-      const y2 = cy + Math.sin(a2) * outerR;
-      const xm = cx + Math.cos(amid) * (outerR - 18);
-      const ym = cy + Math.sin(amid) * (outerR - 18);
-
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.quadraticCurveTo(xm, ym, x2, y2);
-      ctx.stroke();
+        ctx.restore();
     }
 
-    // Inner circle
-    ctx.beginPath();
-    ctx.arc(cx, cy, 140, 0, Math.PI * 2);
-    ctx.stroke();
+    static drawFortressEngraving(ctx, cx, cy, tamilNum, englishNum, isSelected) {
+        ctx.save();
 
-    // Radiating 8-fold lotus petals
-    const lobes = 8;
-    for (let l = 0; l < lobes; l++) {
-      const angle = (l * Math.PI * 2) / lobes;
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(angle);
+        ctx.fillStyle = 'rgba(10, 8, 6, 0.55)';
+        ctx.fillRect(80, 80, 1024 - 160, 1024 - 160);
 
-      ctx.beginPath();
-      ctx.moveTo(25, 0);
-      ctx.bezierCurveTo(50, -28, 105, -24, 130, 0);
-      ctx.bezierCurveTo(105, 24, 50, 28, 25, 0);
-      ctx.fillStyle = emblemFill;
-      ctx.fill();
-      ctx.stroke();
+        const span = 350;
 
-      ctx.beginPath();
-      ctx.moveTo(30, 0);
-      ctx.lineTo(120, 0);
-      ctx.lineWidth = 2.0;
-      ctx.stroke();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 18;
+        ctx.beginPath();
+        ctx.moveTo(cx - span, cy - span);
+        ctx.lineTo(cx + span, cy + span);
+        ctx.moveTo(cx + span, cy - span);
+        ctx.lineTo(cx - span, cy + span);
+        ctx.stroke();
 
-      ctx.restore();
+        ctx.strokeStyle = isSelected ? '#ffd700' : '#d4af37';
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.moveTo(cx - span, cy - span);
+        ctx.lineTo(cx + span, cy + span);
+        ctx.moveTo(cx + span, cy - span);
+        ctx.lineTo(cx - span, cy + span);
+        ctx.stroke();
+
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = 'rgba(212, 175, 55, 0.7)';
+        ctx.strokeRect(cx - span + 60, cy - span + 60, (span - 60) * 2, (span - 60) * 2);
+
+        ctx.fillStyle = '#140f0a';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 135, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#d4af37';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 122, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.font = 'bold 110px "Noto Sans Tamil", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.fillStyle = '#000000';
+        ctx.fillText(tamilNum, cx + 3, cy - 8);
+
+        ctx.fillStyle = isSelected ? '#ffffff' : '#f5dfa2';
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(tamilNum, cx, cy - 10);
+
+        ctx.font = 'bold 40px "Noto Sans Tamil", sans-serif';
+        ctx.fillStyle = '#000000';
+        ctx.fillText('கட்டம்', cx + 2, cy + 362);
+
+        ctx.fillStyle = '#d4af37';
+        ctx.fillText('கட்டம்', cx, cy + 360);
+
+        ctx.font = 'bold 42px monospace';
+        ctx.fillStyle = 'rgba(245, 230, 200, 0.75)';
+        ctx.fillText(`(${englishNum})`, cx, cy + 80);
+
+        ctx.restore();
     }
 
-    // Center hub
-    ctx.fillStyle = emblemColor;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 26, 0, Math.PI * 2);
-    ctx.fill();
+    static drawStandardCell(ctx, cx, cy, tamilNum, englishNum, isSelected) {
+        ctx.save();
 
-    ctx.fillStyle = "#ecd5b5";
-    ctx.beginPath();
-    ctx.arc(cx, cy, 12, 0, Math.PI * 2);
-    ctx.fill();
+        ctx.fillStyle = 'rgba(14, 11, 8, 0.4)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 210, 0, Math.PI * 2);
+        ctx.fill();
 
-    ctx.restore();
-  }
+        ctx.strokeStyle = isSelected ? '#ffd700' : '#d4af37';
+        ctx.lineWidth = isSelected ? 8 : 5;
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 210, 0, Math.PI * 2);
+        ctx.stroke();
 
-  // 4. REALISTIC UV-MAPPED TEXTURE FOR SOLID COWRIE SHELL (சோழி)
-  static createCompleteChozhiTexture(width = 1024, height = 512) {
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 185, 0, Math.PI * 2);
+        ctx.stroke();
 
-    ctx.fillStyle = "#f8f5ee";
-    ctx.fillRect(0, 0, width, height);
+        ctx.font = 'bold 136px "Noto Sans Tamil", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
 
-    // --- DORSAL BACK (முதுகு) ---
-    const topH = height / 2;
-    const cx = width / 2;
-    const cyTop = topH / 2;
+        ctx.fillStyle = '#000000';
+        ctx.shadowBlur = 0;
+        ctx.fillText(tamilNum, cx + 4, cy - 16);
 
-    const dorsalGrad = ctx.createRadialGradient(cx, cyTop, 25, cx, cyTop, 360);
-    dorsalGrad.addColorStop(0, "#fdfcf7");
-    dorsalGrad.addColorStop(0.35, "#f5efdc");
-    dorsalGrad.addColorStop(0.7, "#e4d6b9");
-    dorsalGrad.addColorStop(0.9, "#d0bd9a");
-    dorsalGrad.addColorStop(1, "#bfa882");
-    ctx.fillStyle = dorsalGrad;
-    ctx.fillRect(0, 0, width, topH);
+        ctx.fillStyle = isSelected ? '#ffffff' : '#eed695';
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 5;
+        ctx.fillText(tamilNum, cx, cy - 20);
 
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
-    ctx.lineWidth = 16;
-    ctx.beginPath();
-    ctx.ellipse(cx, cyTop - 20, 210, 65, 0, 0, Math.PI * 2);
-    ctx.stroke();
+        ctx.font = 'bold 46px monospace';
+        ctx.fillStyle = 'rgba(240, 225, 195, 0.65)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(`(${englishNum})`, cx, cy + 120);
 
-    ctx.fillStyle = "rgba(180, 150, 110, 0.25)";
-    for (let s = 0; s < 30; s++) {
-      const rx = cx + (Math.random() - 0.5) * 360;
-      const ry = cyTop + (Math.random() - 0.5) * 120;
-      ctx.beginPath();
-      ctx.arc(rx, ry, 2 + Math.random() * 2.5, 0, Math.PI * 2);
-      ctx.fill();
+        ctx.restore();
     }
 
-    // --- VENTRAL MOUTH (வாய்) ---
-    const cyBot = topH + topH / 2;
+    static createPillarTexture(width = 256, height = 512) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
 
-    const ventralGrad = ctx.createRadialGradient(cx, cyBot, 35, cx, cyBot, 360);
-    ventralGrad.addColorStop(0, "#fbf8f0");
-    ventralGrad.addColorStop(0.6, "#eae1d0");
-    ventralGrad.addColorStop(1, "#d5c6af");
-    ctx.fillStyle = ventralGrad;
-    ctx.fillRect(0, topH, width, topH);
+        const granite = this.createGraniteTexture(width, height, 'granite');
+        ctx.drawImage(granite, 0, 0);
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(90, cyBot);
-    ctx.bezierCurveTo(
-      width * 0.35,
-      cyBot - 14,
-      width * 0.65,
-      cyBot + 14,
-      width - 90,
-      cyBot,
-    );
-    ctx.strokeStyle = "#22140a";
-    ctx.lineWidth = 22;
-    ctx.lineCap = "round";
-    ctx.stroke();
+        const flutes = 8;
+        const step = width / flutes;
+        for (let i = 0; i < flutes; i++) {
+            const x = i * step + step / 2;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.fillRect(x - 2, 0, 4, height);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.fillRect(x + 2, 0, 2, height);
+        }
 
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 8;
-    ctx.stroke();
-    ctx.restore();
+        const bands = [60, 120, height - 120, height - 60];
+        bands.forEach(y => {
+            ctx.fillStyle = 'rgba(212, 175, 55, 0.25)';
+            ctx.fillRect(0, y - 8, width, 16);
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, y - 8, width, 16);
 
-    const teethCount = 28;
-    const startX = 130;
-    const endX = width - 130;
-    const step = (endX - startX) / teethCount;
+            ctx.fillStyle = '#e8c978';
+            for (let bx = 10; bx < width; bx += 20) {
+                ctx.beginPath();
+                ctx.arc(bx, y, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
 
-    for (let i = 0; i <= teethCount; i++) {
-      const x = startX + i * step;
-      const curveOffset = Math.sin((i / teethCount) * Math.PI);
-      const toothLength = 52 * curveOffset + 12;
-
-      ctx.beginPath();
-      ctx.moveTo(x, cyBot - 5);
-      ctx.lineTo(x + (Math.random() - 0.5) * 2, cyBot - 5 - toothLength);
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 6.5;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(x, cyBot + 5);
-      ctx.lineTo(x + (Math.random() - 0.5) * 2, cyBot + 5 + toothLength);
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 6.5;
-      ctx.stroke();
+        return canvas;
     }
-
-    return canvas;
-  }
 }
 
 window.ProceduralTextures = ProceduralTextures;

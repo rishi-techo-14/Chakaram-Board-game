@@ -1,1195 +1,1198 @@
 /**
- * 3D Scene Builder for Chakaram (Chowka Bara)
- * Top-Down View ONLY • Authentic Wooden Board (Matching Image 1)
- *
- * Features:
- * - Fixed Top-Down Camera framing the board, resting places, and side chozhi tray
- * - Light natural birchwood board matching Image 1 with 4 midpoint floral emblems & center mandala
- * - Chozhi rolling tray placed to the RIGHT of the board in plain sight (NOT in center)
- * - Carved resting yard coin slots that EMPTY when a coin enters the board and RE-FILL when captured
- * - Restored original tactile hardwood turned coin designs and sizes
+ * 3D Scene Builder for Chakaram Game (Three.js)
+ * Enhanced with:
+ * - Dynamic Zero-Overlap Multi-Coin Tile Layout Engine
+ * - Smooth Parabolic 3D Hopping with Ease Transitions
+ * - Ludo-style Unsafe Zone Kill / Capture Mechanics
+ * - Elegant Chola Brass Thamboolam Tray & 6 Solid Cowrie Shells
  */
 
 class Chakaram3DScene {
-  constructor(container, gridSize = 5) {
-    this.container = container;
-    this.gridSize = gridSize; // 5 or 7
-    this.scene = null;
-    this.camera = null;
-    this.renderer = null;
-    this.controls = null;
+    constructor(container) {
+        this.container = container;
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.controls = null;
+        
+        // 3D Objects
+        this.boardGroup = null;
+        this.tiles = []; // 5x5 matrix of tile meshes
+        this.tileMaterials = [];
+        this.lamps = [];
+        this.flames = [];
+        this.pawnMap = new Map(); // coinId -> pawnGroup mesh
+        
+        // 6 Chozhi (Cowrie Shells)
+        this.chozhiGroup = null;
+        this.chozhiShells = [];
+        this.isRollingChozhi = false;
+        this.targetShellStates = [];
+        this.chozhiTrayMesh = null;
+        
+        // State
+        this.selectedCell = null;
+        this.hoveredCell = null;
+        this.currentTheme = 'granite';
+        this.currentAtmosphere = 'night';
+        this.isCoinAnimating = false;
+        
+        // Raycaster
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+        
+        // Callbacks
+        this.onCellSelected = null;
+        this.onCellHovered = null;
+        this.onPawnClicked = null;
+        this.onChozhiRolled = null;
 
-    // 3D Groups
-    this.boardGroup = null;
-    this.tiles = [];
-    this.homeYards = {}; // yardIndex / side -> yard group
-    this.pawnMap = new Map(); // coinId -> pawnGroup mesh
-
-    // Cowrie Shells (Chozhi) - To the RIGHT of the board
-    this.chozhiGroup = null;
-    this.chozhiShells = [];
-    this.isRollingChozhi = false;
-    this.targetShellStates = [];
-    this.chozhiTrayMesh = null;
-
-    // State
-    this.isCoinAnimating = false;
-
-    // Raycaster
-    this.raycaster = new THREE.Raycaster();
-    this.mouse = new THREE.Vector2();
-
-    // Callbacks
-    this.onPawnClicked = null;
-    this.onChozhiRolled = null;
-
-    window.chakaramScene = this;
-    this.init();
-  }
-
-  init() {
-    // 1. Scene with soft neutral studio background (matching Image 1)
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xd2cbc1);
-
-    // 2. Camera: STRICT TOP-DOWN VIEW ONLY
-    const aspect = this.container.clientWidth / this.container.clientHeight;
-    this.camera = new THREE.PerspectiveCamera(38, aspect, 0.1, 100);
-    this.setTopDownCamera();
-
-    // 3. WebGL Renderer
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: true,
-      powerPreference: "high-performance",
-    });
-    this.renderer.setSize(
-      this.container.clientWidth,
-      this.container.clientHeight,
-    );
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
-    this.container.appendChild(this.renderer.domElement);
-
-    // 4. OrbitControls: Locked to Top-Down (No orbit/tilt)
-    if (THREE.OrbitControls) {
-      this.controls = new THREE.OrbitControls(
-        this.camera,
-        this.renderer.domElement,
-      );
-      this.controls.enableRotate = false; // Strictly Top-Down!
-      this.controls.enableDamping = true;
-      this.controls.dampingFactor = 0.08;
-      this.controls.minDistance = 8;
-      this.controls.maxDistance = 25;
-      this.controls.target.set(0.6, 0, 0);
+        window.chakaramScene = this;
+        this.init();
     }
 
-    // 5. Studio Lighting
-    this.setupLighting();
+    init() {
+        // 1. Scene setup
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x0a0908);
+        this.scene.fog = new THREE.FogExp2(0x0a0908, 0.024);
 
-    // 6. Build Initial Board
-    this.rebuildBoard(this.gridSize);
+        // 2. Camera setup
+        const aspect = this.container.clientWidth / this.container.clientHeight;
+        this.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
+        this.camera.position.set(-5.5, 7.8, 9.2);
 
-    // 7. Event Listeners
-    window.addEventListener("resize", this.onResize.bind(this));
-    this.renderer.domElement.addEventListener(
-      "mousemove",
-      this.onMouseMove.bind(this),
-    );
-    this.renderer.domElement.addEventListener(
-      "click",
-      this.onPointerClick.bind(this),
-    );
+        // 3. Renderer setup
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+        this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.15;
+        this.container.appendChild(this.renderer.domElement);
 
-    // 8. Render Loop
-    this.animate = this.animate.bind(this);
-    requestAnimationFrame(this.animate);
-  }
+        // 4. Orbit Controls
+        if (THREE.OrbitControls) {
+            this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+            this.controls.enableDamping = true;
+            this.controls.dampingFactor = 0.05;
+            this.controls.maxPolarAngle = Math.PI / 2 - 0.05;
+            this.controls.minDistance = 4;
+            this.controls.maxDistance = 26;
+            this.controls.target.set(0.5, 0.5, 0);
+        }
 
-  setTopDownCamera() {
-    if (!this.camera) return;
-    // Perfect top-down framing showing the board and the right-side Chozhi tray
-    if (this.gridSize === 7) {
-      this.camera.position.set(0.6, 19.5, 0.001);
-    } else {
-      this.camera.position.set(0.6, 16.5, 0.001);
+        // 5. Build Scene Objects
+        this.buildTempleEnvironment();
+        this.build5x5MatrixBoard();
+        this.buildStartingPawns();
+        this.buildKuthuvilakkuLamps();
+        this.build6ChozhiDice();
+        this.setupLighting();
+
+        // 6. Event listeners
+        window.addEventListener('resize', this.onResize.bind(this));
+        this.renderer.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
+        this.renderer.domElement.addEventListener('click', this.onPointerClick.bind(this));
+
+        // 7. Start render loop
+        this.animate = this.animate.bind(this);
+        requestAnimationFrame(this.animate);
     }
-    if (this.controls) {
-      this.controls.target.set(0.6, 0, 0);
-      this.controls.update();
-    }
-  }
 
-  // --- REBUILD BOARD ---
-  rebuildBoard(gridSize) {
-    this.gridSize = gridSize;
-    this.setTopDownCamera();
+    // --- TEMPLE MANDAPAM ENVIRONMENT ---
+    buildTempleEnvironment() {
+        const floorGeo = new THREE.PlaneGeometry(36, 36);
+        const kolamCanvas = ProceduralTextures.createKolamFloorTexture(1024);
+        const floorTex = new THREE.CanvasTexture(kolamCanvas);
+        floorTex.wrapS = THREE.RepeatWrapping;
+        floorTex.wrapT = THREE.RepeatWrapping;
 
-    if (this.boardGroup) {
-      this.scene.remove(this.boardGroup);
-    }
-    if (this.chozhiGroup) {
-      this.scene.remove(this.chozhiGroup);
-    }
-    Object.values(this.homeYards).forEach((yard) => this.scene.remove(yard));
-    this.homeYards = {};
-
-    this.buildMatrixBoard();
-    this.buildHomeYards();
-    this.buildStartingPawns();
-    this.buildSideChozhiDice();
-  }
-
-  // --- AUTHENTIC WOODEN BOARD (MATCHING IMAGE 1) ---
-  buildMatrixBoard() {
-    this.boardGroup = new THREE.Group();
-    const N = this.gridSize;
-    const mid = Math.floor(N / 2);
-
-    const tileSize = N === 7 ? 1.05 : 1.25;
-    const totalSpan = N * tileSize;
-    const baseWidth = totalSpan + 0.55;
-    const baseHeight = 0.32;
-
-    this.boardBaseWidth = baseWidth;
-    this.tileSize = tileSize;
-
-    // Wooden Peedam base with natural birch side
-    const peedamGeo = new THREE.BoxGeometry(baseWidth, baseHeight, baseWidth);
-    const woodSideCanvas = ProceduralTextures.createWoodTexture(
-      "sandalwood",
-      256,
-      256,
-    );
-    const woodSideTex = new THREE.CanvasTexture(woodSideCanvas);
-
-    const peedamMat = new THREE.MeshStandardMaterial({
-      map: woodSideTex,
-      roughness: 0.65,
-      metalness: 0.05,
-    });
-    const peedam = new THREE.Mesh(peedamGeo, peedamMat);
-    peedam.position.y = baseHeight / 2;
-    peedam.receiveShadow = true;
-    peedam.castShadow = true;
-    this.boardGroup.add(peedam);
-
-    // Thin raised wooden rim around the board (as seen in Image 1)
-    const rimGeo = new THREE.BoxGeometry(
-      baseWidth + 0.08,
-      0.04,
-      baseWidth + 0.08,
-    );
-    const rimMat = new THREE.MeshStandardMaterial({
-      color: 0xc8a882,
-      roughness: 0.5,
-      metalness: 0.1,
-    });
-    const rimMesh = new THREE.Mesh(rimGeo, rimMat);
-    rimMesh.position.y = baseHeight;
-    this.boardGroup.add(rimMesh);
-
-    // 5x5 / 7x7 Grid Tiles
-    const startOffset = -((N - 1) / 2) * tileSize;
-    this.tiles = [];
-
-    const engine = window.chakaramEngine;
-
-    for (let row = 0; row < N; row++) {
-      this.tiles[row] = [];
-      for (let col = 0; col < N; col++) {
-        const isCenter = row === mid && col === mid;
-        // Safe houses at the 4 midpoints (as in Image 1)
-        const isMidpoint =
-          ((row === 0 || row === N - 1) && col === mid) ||
-          ((col === 0 || col === N - 1) && row === mid);
-        const isSafe = isMidpoint;
-
-        const tileCanvas = ProceduralTextures.createTileTexture(
-          row,
-          col,
-          N,
-          false,
-          isSafe,
-          isCenter,
-          false,
-        );
-        const tileTex = new THREE.CanvasTexture(tileCanvas);
-
-        const topMat = new THREE.MeshStandardMaterial({
-          map: tileTex,
-          roughness: 0.62,
-          metalness: 0.08,
+        const floorMat = new THREE.MeshStandardMaterial({
+            map: floorTex,
+            roughness: 0.85,
+            metalness: 0.15
         });
 
-        const tileThickness = 0.12;
-        const tileGeo = new THREE.BoxGeometry(
-          tileSize,
-          tileThickness,
-          tileSize,
-        );
-        const mats = [
-          peedamMat,
-          peedamMat,
-          topMat,
-          peedamMat,
-          peedamMat,
-          peedamMat,
-        ];
-        const tileMesh = new THREE.Mesh(tileGeo, mats);
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = 0;
+        floor.receiveShadow = true;
+        this.scene.add(floor);
 
-        const posX = startOffset + col * tileSize;
-        const posZ = startOffset + row * tileSize;
-        const posY = baseHeight + tileThickness / 2;
-
-        tileMesh.position.set(posX, posY, posZ);
-        tileMesh.castShadow = true;
-        tileMesh.receiveShadow = true;
-
-        tileMesh.userData = {
-          row,
-          col,
-          index: row * N + col + 1,
-          baseY: posY,
-          isCenter: isCenter,
-          isSafeHouse: isSafe,
-          tileSize: tileSize,
-        };
-
-        this.boardGroup.add(tileMesh);
-        this.tiles[row][col] = tileMesh;
-      }
-    }
-
-    this.scene.add(this.boardGroup);
-  }
-
-  // --- CARVED HOME RESTING YARDS WITH VISIBLE SLOTS ---
-  buildHomeYards() {
-    this.homeYards = {};
-    const baseOffset = this.boardBaseWidth / 2 + 0.75;
-
-    // 4 Sides: South (P1), West (P2), North (P3), East (P4)
-    const yardConfigs = [
-      { side: "SOUTH", x: 0, z: baseOffset, color: 0xd4883b },
-      { side: "WEST", x: -baseOffset, z: 0, color: 0xa8422b },
-      { side: "NORTH", x: 0, z: -baseOffset, color: 0x7c3a21 },
-      { side: "EAST", x: baseOffset, z: 0, color: 0xd9b177 },
-    ];
-
-    yardConfigs.forEach((cfg) => {
-      const yardGroup = new THREE.Group();
-
-      // Yard base
-      const yardW = 2.0;
-      const yardH = 0.15;
-      const yardGeo = new THREE.CylinderGeometry(
-        yardW / 2,
-        yardW / 2 + 0.05,
-        yardH,
-        32,
-      );
-      const yardMat = new THREE.MeshStandardMaterial({
-        color: cfg.color,
-        roughness: 0.5,
-        metalness: 0.1,
-      });
-      const yardBase = new THREE.Mesh(yardGeo, yardMat);
-      yardBase.position.y = yardH / 2;
-      yardBase.receiveShadow = true;
-      yardBase.castShadow = true;
-      yardGroup.add(yardBase);
-
-      // Carve 4 distinct indented coin spots / resting slots
-      const slotOffsets = [
-        [-0.35, -0.35],
-        [0.35, -0.35],
-        [-0.35, 0.35],
-        [0.35, 0.35],
-      ];
-
-      yardGroup.userData.slots = [];
-
-      slotOffsets.forEach(([sx, sz], sIdx) => {
-        // Indented circular spot (empty depression)
-        const spotGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.03, 20);
-        const spotMat = new THREE.MeshStandardMaterial({
-          color: 0x221a14,
-          roughness: 0.85,
-          metalness: 0.1,
+        const pillarCanvas = ProceduralTextures.createPillarTexture(256, 512);
+        const pillarTex = new THREE.CanvasTexture(pillarCanvas);
+        const pillarMat = new THREE.MeshStandardMaterial({
+            map: pillarTex,
+            roughness: 0.9,
+            metalness: 0.2
         });
-        const spotMesh = new THREE.Mesh(spotGeo, spotMat);
-        spotMesh.position.set(sx, yardH + 0.01, sz);
-        spotMesh.receiveShadow = true;
-        yardGroup.add(spotMesh);
 
-        // Brass thin indicator ring around slot
-        const ringGeo = new THREE.RingGeometry(0.22, 0.25, 20);
-        ringGeo.rotateX(-Math.PI / 2);
-        const ringMat = new THREE.MeshBasicMaterial({
-          color: 0xd4af37,
-          side: THREE.DoubleSide,
-        });
-        const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-        ringMesh.position.set(sx, yardH + 0.02, sz);
-        yardGroup.add(ringMesh);
-
-        yardGroup.userData.slots.push({
-          index: sIdx,
-          x: sx,
-          z: sz,
-          isOccupied: true,
-          spotMesh: spotMesh,
-        });
-      });
-
-      yardGroup.position.set(cfg.x, 0, cfg.z);
-      yardGroup.userData.side = cfg.side;
-      yardGroup.userData.baseY = yardH;
-
-      this.scene.add(yardGroup);
-      this.homeYards[cfg.side] = yardGroup;
-    });
-  }
-
-  // --- RESTORE ORIGINAL HARDWOOD COIN MODELS & SIZES ---
-  buildStartingPawns() {
-    this.pawnMap.clear();
-
-    const woodTypes = ["teak", "cedar", "rosewood", "sandalwood"];
-    const woodMaterials = woodTypes.map((type) => {
-      const canvas = ProceduralTextures.createWoodTexture(type, 512, 512);
-      return new THREE.MeshStandardMaterial({
-        map: new THREE.CanvasTexture(canvas),
-        roughness: 0.38,
-        metalness: 0.04,
-      });
-    });
-
-    const engine = window.chakaramEngine;
-    const activePlayers = engine
-      ? engine.players
-      : [
-          { id: 1, side: "SOUTH", name: "தெற்கு" },
-          { id: 2, side: "WEST", name: "மேற்கு" },
-          { id: 3, side: "NORTH", name: "வடக்கு" },
-          { id: 4, side: "EAST", name: "கிழக்கு" },
+        const pillarPositions = [
+            [-9.2, -8.5], [9.2, -8.5],
+            [-9.2, 8.5], [9.2, 8.5],
+            [-9.2, 0], [9.2, 0]
         ];
 
-    activePlayers.forEach((player, pIdx) => {
-      const yardGroup = this.homeYards[player.side];
-      if (!yardGroup) return;
+        pillarPositions.forEach(([px, pz]) => {
+            const pillarGroup = new THREE.Group();
 
-      const mat = woodMaterials[pIdx % woodMaterials.length];
-      const shapeType =
-        pIdx === 0 || pIdx === 1 ? "spool" : pIdx === 2 ? "knob" : "bullet";
+            const baseGeo = new THREE.BoxGeometry(1.6, 0.6, 1.6);
+            const baseMesh = new THREE.Mesh(baseGeo, pillarMat);
+            baseMesh.position.y = 0.3;
+            baseMesh.castShadow = true;
+            baseMesh.receiveShadow = true;
+            pillarGroup.add(baseMesh);
 
-      for (let slotIdx = 0; slotIdx < 4; slotIdx++) {
-        const pawnGroup = new THREE.Group();
-        const coinId = `${player.id}_${slotIdx}`;
+            const shaftGeo = new THREE.BoxGeometry(1.1, 10, 1.1);
+            const shaftMesh = new THREE.Mesh(shaftGeo, pillarMat);
+            shaftMesh.position.y = 5.3;
+            shaftMesh.castShadow = true;
+            shaftMesh.receiveShadow = true;
+            pillarGroup.add(shaftMesh);
 
-        // Restore original lathe shapes and proportions
-        if (shapeType === "spool") {
-          const baseGeo = new THREE.CylinderGeometry(0.1, 0.16, 0.2, 18);
-          const base = new THREE.Mesh(baseGeo, mat);
-          base.position.y = 0.1;
-          base.castShadow = true;
-          pawnGroup.add(base);
+            const capGeo = new THREE.BoxGeometry(2.0, 0.8, 2.0);
+            const capMesh = new THREE.Mesh(capGeo, pillarMat);
+            capMesh.position.y = 10.4;
+            capMesh.castShadow = true;
+            pillarGroup.add(capMesh);
 
-          const topGeo = new THREE.CylinderGeometry(0.15, 0.09, 0.18, 18);
-          const top = new THREE.Mesh(topGeo, mat);
-          top.position.y = 0.29;
-          top.castShadow = true;
-          pawnGroup.add(top);
-        } else if (shapeType === "knob") {
-          const bodyGeo = new THREE.CylinderGeometry(0.09, 0.16, 0.28, 18);
-          const body = new THREE.Mesh(bodyGeo, mat);
-          body.position.y = 0.14;
-          body.castShadow = true;
-          pawnGroup.add(body);
-
-          const knobGeo = new THREE.SphereGeometry(0.11, 16, 14);
-          const knob = new THREE.Mesh(knobGeo, mat);
-          knob.position.y = 0.32;
-          knob.castShadow = true;
-          pawnGroup.add(knob);
-        } else {
-          const bodyGeo = new THREE.CylinderGeometry(0.13, 0.16, 0.24, 18);
-          const body = new THREE.Mesh(bodyGeo, mat);
-          body.position.y = 0.12;
-          body.castShadow = true;
-          pawnGroup.add(body);
-
-          const domeGeo = new THREE.SphereGeometry(
-            0.13,
-            16,
-            12,
-            0,
-            Math.PI * 2,
-            0,
-            Math.PI / 2,
-          );
-          const dome = new THREE.Mesh(domeGeo, mat);
-          dome.position.y = 0.24;
-          dome.castShadow = true;
-          pawnGroup.add(dome);
-        }
-
-        // Selection Halo
-        const ringGeo = new THREE.RingGeometry(0.18, 0.26, 24);
-        ringGeo.rotateX(-Math.PI / 2);
-        const ringMat = new THREE.MeshBasicMaterial({
-          color: 0xffd700,
-          side: THREE.DoubleSide,
-          transparent: true,
-          opacity: 0,
+            pillarGroup.position.set(px, 0, pz);
+            this.scene.add(pillarGroup);
         });
-        const selectionRing = new THREE.Mesh(ringGeo, ringMat);
-        selectionRing.position.y = 0.01;
-        pawnGroup.add(selectionRing);
 
-        const slot = yardGroup.userData.slots[slotIdx];
-        pawnGroup.position.set(slot.x, yardGroup.userData.baseY, slot.z);
+        const wallGeo = new THREE.BoxGeometry(36, 12, 1);
+        const wallMat = new THREE.MeshStandardMaterial({
+            map: floorTex,
+            roughness: 0.9,
+            color: 0x22201d
+        });
+        const backWall = new THREE.Mesh(wallGeo, wallMat);
+        backWall.position.set(0, 6, -13);
+        backWall.receiveShadow = true;
+        this.scene.add(backWall);
+    }
 
-        pawnGroup.userData = {
-          isPawn: true,
-          coinId: coinId,
-          playerId: player.id,
-          slotIndex: slotIdx,
-          homeYard: yardGroup,
-          isInHomeYard: true,
-          currentTile: null,
-          selectionRing: selectionRing,
-          isMovable: false,
-        };
+    // --- 5x5 MATRIX GAME BOARD (சக்கரக் களம்) ---
+    build5x5MatrixBoard() {
+        this.boardGroup = new THREE.Group();
 
-        yardGroup.add(pawnGroup);
-        this.pawnMap.set(coinId, pawnGroup);
-      }
-    });
-  }
+        const baseWidth = 7.6;
+        const baseHeight = 0.45;
+        const peedamGeo = new THREE.BoxGeometry(baseWidth, baseHeight, baseWidth);
+        const graniteCanvas = ProceduralTextures.createGraniteTexture(512, 512, this.currentTheme);
+        const graniteTex = new THREE.CanvasTexture(graniteCanvas);
+        
+        const peedamMat = new THREE.MeshStandardMaterial({
+            map: graniteTex,
+            roughness: 0.75,
+            metalness: 0.25
+        });
+        const peedam = new THREE.Mesh(peedamGeo, peedamMat);
+        peedam.position.y = baseHeight / 2;
+        peedam.receiveShadow = true;
+        peedam.castShadow = true;
+        this.boardGroup.add(peedam);
 
-  // --- CHOZHI ROLLING TRAY PLACED BESIDE THE BOARD (NOT IN CENTER) ---
-  buildSideChozhiDice() {
-    this.chozhiGroup = new THREE.Group();
-    const numShells = this.gridSize === 7 ? 6 : 4;
+        const rimGeo = new THREE.BoxGeometry(baseWidth + 0.12, 0.08, baseWidth + 0.12);
+        const goldMat = new THREE.MeshStandardMaterial({
+            color: 0xd4af37,
+            roughness: 0.35,
+            metalness: 0.85
+        });
+        const rimMesh = new THREE.Mesh(rimGeo, goldMat);
+        rimMesh.position.y = baseHeight;
+        this.boardGroup.add(rimMesh);
 
-    // Elegant brass tray
-    const trayRadius = 1.35;
-    const trayH = 0.14;
+        const tileSize = 1.35;
+        const tileGap = 0.06;
+        const tileThickness = 0.18;
+        const startOffset = -2 * (tileSize + tileGap);
 
-    const trayBaseGeo = new THREE.CylinderGeometry(
-      trayRadius,
-      trayRadius * 0.94,
-      trayH,
-      36,
-    );
-    const brassMat = new THREE.MeshStandardMaterial({
-      color: 0xd4af37,
-      roughness: 0.25,
-      metalness: 0.88,
-    });
-    this.chozhiTrayMesh = new THREE.Mesh(trayBaseGeo, brassMat);
-    this.chozhiTrayMesh.position.y = trayH / 2;
-    this.chozhiTrayMesh.receiveShadow = true;
-    this.chozhiTrayMesh.castShadow = true;
-    this.chozhiGroup.add(this.chozhiTrayMesh);
+        this.tiles = [];
+        this.tileMaterials = [];
 
-    const trayRimGeo = new THREE.TorusGeometry(trayRadius - 0.03, 0.05, 16, 36);
-    trayRimGeo.rotateX(Math.PI / 2);
-    const trayRim = new THREE.Mesh(trayRimGeo, brassMat);
-    trayRim.position.y = trayH;
-    this.chozhiGroup.add(trayRim);
+        for (let row = 0; row < 5; row++) {
+            this.tiles[row] = [];
+            for (let col = 0; col < 5; col++) {
+                const tileCanvas = ProceduralTextures.createTileTexture(row, col, false, this.currentTheme);
+                const tileTex = new THREE.CanvasTexture(tileCanvas);
 
-    const velvetGeo = new THREE.CylinderGeometry(
-      trayRadius - 0.08,
-      trayRadius - 0.08,
-      0.03,
-      36,
-    );
-    const velvetMat = new THREE.MeshStandardMaterial({
-      color: 0x6e1a1a,
-      roughness: 0.95,
-      metalness: 0.02,
-    });
-    const velvetMesh = new THREE.Mesh(velvetGeo, velvetMat);
-    velvetMesh.position.y = trayH + 0.01;
-    velvetMesh.receiveShadow = true;
-    this.chozhiGroup.add(velvetMesh);
+                const topMat = new THREE.MeshStandardMaterial({
+                    map: tileTex,
+                    roughness: 0.68,
+                    metalness: 0.18
+                });
 
-    // Solid Cowrie Shell Models
-    const shellTextureCanvas = ProceduralTextures.createCompleteChozhiTexture(
-      1024,
-      512,
-    );
-    const shellTex = new THREE.CanvasTexture(shellTextureCanvas);
-    const solidShellMaterial = new THREE.MeshStandardMaterial({
-      map: shellTex,
-      roughness: 0.16,
-      metalness: 0.04,
-    });
+                const sideMat = new THREE.MeshStandardMaterial({
+                    map: graniteTex,
+                    roughness: 0.85,
+                    metalness: 0.2
+                });
 
-    const baseSphere = new THREE.SphereGeometry(0.32, 28, 20);
-    const posAttr = baseSphere.attributes.position;
-    const uvAttr = baseSphere.attributes.uv;
+                const mats = [sideMat, sideMat, topMat, sideMat, sideMat, sideMat];
+                this.tileMaterials.push({ row, col, topMat, tileTex });
 
-    for (let i = 0; i < posAttr.count; i++) {
-      let px = posAttr.getX(i);
-      let py = posAttr.getY(i);
-      let pz = posAttr.getZ(i);
+                const tileGeo = new THREE.BoxGeometry(tileSize, tileThickness, tileSize);
+                const tileMesh = new THREE.Mesh(tileGeo, mats);
 
-      px *= 1.55;
-      pz *= 0.92;
+                const posX = startOffset + col * (tileSize + tileGap);
+                const posZ = startOffset + row * (tileSize + tileGap);
+                const posY = baseHeight + tileThickness / 2;
 
-      const taper = Math.max(
-        0.25,
-        1.0 - Math.pow(Math.abs(px) / 0.55, 2) * 0.42,
-      );
-      py *= taper;
-      pz *= taper;
+                tileMesh.position.set(posX, posY, posZ);
+                tileMesh.castShadow = true;
+                tileMesh.receiveShadow = true;
 
-      if (py >= 0) {
-        const distFromCenterSlit = Math.abs(pz);
-        if (distFromCenterSlit < 0.12) {
-          py = py * 0.22 - 0.03 * (1.0 - distFromCenterSlit / 0.12);
+                tileMesh.userData = {
+                    row,
+                    col,
+                    index: row * 5 + col + 1,
+                    baseY: posY,
+                    isElevated: false,
+                    isCenter: (row === 2 && col === 2),
+                    isFortress: (row === 0 || row === 4) && (col === 0 || col === 4) ||
+                                (row === 2 && (col === 0 || col === 4)) || (col === 2 && (row === 0 || row === 4))
+                };
+
+                this.boardGroup.add(tileMesh);
+                this.tiles[row][col] = tileMesh;
+            }
+        }
+
+        this.scene.add(this.boardGroup);
+    }
+
+    // --- DYNAMIC ZERO-OVERLAP TILE COIN LAYOUT ENGINE ---
+    // Automatically arranges all coins on a given tile so they NEVER overlap
+    layoutCoinsOnTile(tile) {
+        if (!tile) return;
+
+        // Find all active pawn children on this tile
+        const pawns = tile.children.filter(c => c.userData && c.userData.isPawn);
+        const count = pawns.length;
+        if (count === 0) return;
+
+        // Non-overlapping geometric offsets based on coin count
+        let layoutOffsets = [];
+        if (count === 1) {
+            layoutOffsets = [[0, 0]];
+        } else if (count === 2) {
+            layoutOffsets = [[-0.26, 0], [0.26, 0]];
+        } else if (count === 3) {
+            layoutOffsets = [
+                [0, -0.24],
+                [-0.25, 0.22],
+                [0.25, 0.22]
+            ];
+        } else if (count === 4) {
+            layoutOffsets = [
+                [-0.26, -0.26],
+                [0.26, -0.26],
+                [-0.26, 0.26],
+                [0.26, 0.26]
+            ];
         } else {
-          py = py * 0.52;
-        }
-      } else {
-        py = py * 0.82;
-      }
-
-      posAttr.setXYZ(i, px, py, pz);
-
-      const u = (px / 1.55 + 0.32) / 0.64;
-      let v = 0.5;
-      if (py >= 0) {
-        v = 0.5 + Math.min(0.5, (Math.abs(pz) / 0.32) * 0.5);
-      } else {
-        v = 0.5 - Math.min(0.5, (Math.abs(py) / 0.32) * 0.5);
-      }
-      uvAttr.setXY(i, Math.max(0, Math.min(1, u)), Math.max(0, Math.min(1, v)));
-    }
-    baseSphere.computeVertexNormals();
-
-    this.chozhiShells = [];
-    let shellPositions = [];
-
-    if (numShells === 4) {
-      shellPositions = [
-        [-0.42, -0.38],
-        [0.42, -0.38],
-        [-0.42, 0.38],
-        [0.42, 0.38],
-      ];
-    } else {
-      shellPositions = [
-        [-0.55, -0.38],
-        [0.0, -0.48],
-        [0.55, -0.38],
-        [-0.55, 0.38],
-        [0.0, 0.48],
-        [0.55, 0.38],
-      ];
-    }
-
-    const shellBaseY = trayH + 0.16;
-
-    for (let i = 0; i < numShells; i++) {
-      const shellMesh = new THREE.Mesh(baseSphere.clone(), solidShellMaterial);
-      const [sx, sz] = shellPositions[i];
-
-      shellMesh.position.set(sx, shellBaseY, sz);
-      shellMesh.castShadow = true;
-      shellMesh.receiveShadow = true;
-
-      const isUpViewing = i % 2 === 0;
-      shellMesh.rotation.x = isUpViewing ? 0 : Math.PI;
-      shellMesh.rotation.y =
-        (Math.random() - 0.5) * 0.4 + (i * Math.PI) / numShells;
-
-      shellMesh.userData = {
-        index: i,
-        baseX: sx,
-        baseZ: sz,
-        baseY: shellBaseY,
-        isUpViewing: isUpViewing,
-      };
-
-      this.chozhiGroup.add(shellMesh);
-      this.chozhiShells.push(shellMesh);
-    }
-
-    // Position Chozhi tray to the RIGHT of the board in direct sight
-    const posX = this.boardBaseWidth / 2 + 1.85;
-    this.chozhiGroup.position.set(posX, 0, 0);
-    this.scene.add(this.chozhiGroup);
-  }
-
-  // --- NON-OVERLAPPING COIN LAYOUT ON TILES ---
-  layoutCoinsOnTile(tile) {
-    if (!tile) return;
-    const pawns = tile.children.filter((c) => c.userData && c.userData.isPawn);
-    const count = pawns.length;
-    if (count === 0) return;
-
-    const factor = this.gridSize === 7 ? 0.68 : 0.88;
-    let offsets = [];
-
-    if (count === 1) {
-      offsets = [[0, 0]];
-    } else if (count === 2) {
-      offsets = [
-        [-0.22 * factor, 0],
-        [0.22 * factor, 0],
-      ];
-    } else if (count === 3) {
-      offsets = [
-        [0, -0.2 * factor],
-        [-0.2 * factor, 0.18 * factor],
-        [0.2 * factor, 0.18 * factor],
-      ];
-    } else if (count === 4) {
-      offsets = [
-        [-0.22 * factor, -0.22 * factor],
-        [0.22 * factor, -0.22 * factor],
-        [-0.22 * factor, 0.22 * factor],
-        [0.22 * factor, 0.22 * factor],
-      ];
-    } else {
-      for (let i = 0; i < count; i++) {
-        const angle = (i * Math.PI * 2) / count;
-        offsets.push([
-          Math.cos(angle) * 0.28 * factor,
-          Math.sin(angle) * 0.28 * factor,
-        ]);
-      }
-    }
-
-    pawns.forEach((pawn, idx) => {
-      const [ox, oz] = offsets[idx] || [0, 0];
-      pawn.position.set(ox, 0.08, oz);
-    });
-  }
-
-  setMovableCoins(legalMoves) {
-    this.pawnMap.forEach((pawn) => {
-      pawn.userData.isMovable = false;
-      pawn.userData.selectionRing.material.opacity = 0;
-    });
-
-    if (!legalMoves || legalMoves.length === 0) return;
-
-    legalMoves.forEach((move) => {
-      const pawn = this.pawnMap.get(move.coin.id);
-      if (pawn) {
-        pawn.userData.isMovable = true;
-        pawn.userData.legalMove = move;
-        pawn.userData.selectionRing.material.opacity = 0.88;
-      }
-    });
-  }
-
-  // --- ANIMATE COIN HOPPING & EMPTYING RESTING SLOTS ---
-  animatePawnMovement(
-    coinId,
-    hopPath,
-    capturedCoin,
-    isGoal,
-    isUnlock,
-    onComplete,
-  ) {
-    const pawn = this.pawnMap.get(coinId);
-    if (!pawn || !hopPath || hopPath.length === 0) {
-      if (onComplete) onComplete();
-      return;
-    }
-
-    this.isCoinAnimating = true;
-    this.setMovableCoins([]);
-
-    const originTile = pawn.userData.currentTile;
-    const originYard = pawn.userData.homeYard;
-    const slotIdx = pawn.userData.slotIndex;
-
-    // If unlocking from resting yard, mark that slot as EMPTY!
-    if (pawn.userData.isInHomeYard && originYard) {
-      originYard.userData.slots[slotIdx].isOccupied = false;
-    }
-
-    let currentHopIdx = 0;
-
-    const executeSingleHop = () => {
-      if (currentHopIdx >= hopPath.length) {
-        const finalCoord = hopPath[hopPath.length - 1];
-        const finalTile = this.tiles[finalCoord.r][finalCoord.c];
-
-        finalTile.attach(pawn);
-        pawn.userData.currentTile = finalTile;
-        pawn.userData.isInHomeYard = false;
-
-        if (originTile) this.layoutCoinsOnTile(originTile);
-        this.layoutCoinsOnTile(finalTile);
-
-        if (isGoal) {
-          this.animateCrownedPawn(pawn);
+            // 5 or more (e.g., crowd in center)
+            for (let i = 0; i < count; i++) {
+                const angle = (i * Math.PI * 2) / count;
+                layoutOffsets.push([Math.cos(angle) * 0.32, Math.sin(angle) * 0.32]);
+            }
         }
 
-        if (capturedCoin) {
-          this.animateCapturedPawn(capturedCoin.id, () => {
-            this.layoutCoinsOnTile(finalTile);
-            this.isCoinAnimating = false;
+        pawns.forEach((pawn, idx) => {
+            const [ox, oz] = layoutOffsets[idx] || [0, 0];
+            pawn.position.set(ox, 0.09, oz);
+        });
+    }
+
+    // --- 4 PLAYERS x 4 COINS = 16 HARDWOOD PAWNS ---
+    buildStartingPawns() {
+        this.pawnMap.clear();
+
+        const woodTypes = ['teak', 'rosewood', 'sandalwood', 'cedar'];
+        const woodMaterials = woodTypes.map(type => {
+            const canvas = ProceduralTextures.createWoodTexture(type, 512, 512);
+            return new THREE.MeshStandardMaterial({
+                map: new THREE.CanvasTexture(canvas),
+                roughness: 0.38,
+                metalness: 0.04
+            });
+        });
+
+        const startingHouses = [
+            { row: 4, col: 2, player: 1, name: 'தெற்கு வீரர் (Player 1 - South)', woodIdx: 0, shapeType: 'spool' },
+            { row: 0, col: 2, player: 2, name: 'வடக்கு வீரர் (Player 2 - North)', woodIdx: 1, shapeType: 'knob' },
+            { row: 2, col: 4, player: 3, name: 'கிழக்கு வீரர் (Player 3 - East)', woodIdx: 2, shapeType: 'bullet' },
+            { row: 2, col: 0, player: 4, name: 'மேற்கு வீரர் (Player 4 - West)', woodIdx: 3, shapeType: 'spool' }
+        ];
+
+        startingHouses.forEach(house => {
+            const tile = this.tiles[house.row][house.col];
+            const mat = woodMaterials[house.woodIdx];
+
+            for (let pIdx = 0; pIdx < 4; pIdx++) {
+                const pawnGroup = new THREE.Group();
+                const coinId = `${house.player}_${pIdx}`;
+
+                if (house.shapeType === 'spool') {
+                    const baseGeo = new THREE.CylinderGeometry(0.10, 0.16, 0.20, 18);
+                    const base = new THREE.Mesh(baseGeo, mat);
+                    base.position.y = 0.10;
+                    base.castShadow = true;
+                    pawnGroup.add(base);
+
+                    const topGeo = new THREE.CylinderGeometry(0.15, 0.09, 0.18, 18);
+                    const top = new THREE.Mesh(topGeo, mat);
+                    top.position.y = 0.29;
+                    top.castShadow = true;
+                    pawnGroup.add(top);
+                } else if (house.shapeType === 'knob') {
+                    const bodyGeo = new THREE.CylinderGeometry(0.09, 0.16, 0.28, 18);
+                    const body = new THREE.Mesh(bodyGeo, mat);
+                    body.position.y = 0.14;
+                    body.castShadow = true;
+                    pawnGroup.add(body);
+
+                    const knobGeo = new THREE.SphereGeometry(0.11, 16, 14);
+                    const knob = new THREE.Mesh(knobGeo, mat);
+                    knob.position.y = 0.32;
+                    knob.castShadow = true;
+                    pawnGroup.add(knob);
+                } else {
+                    const bodyGeo = new THREE.CylinderGeometry(0.13, 0.16, 0.24, 18);
+                    const body = new THREE.Mesh(bodyGeo, mat);
+                    body.position.y = 0.12;
+                    body.castShadow = true;
+                    pawnGroup.add(body);
+
+                    const domeGeo = new THREE.SphereGeometry(0.13, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+                    const dome = new THREE.Mesh(domeGeo, mat);
+                    dome.position.y = 0.24;
+                    dome.castShadow = true;
+                    pawnGroup.add(dome);
+                }
+
+                // Glowing Selection Aura
+                const ringGeo = new THREE.RingGeometry(0.18, 0.26, 24);
+                ringGeo.rotateX(-Math.PI / 2);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: 0xffd700,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0
+                });
+                const selectionRing = new THREE.Mesh(ringGeo, ringMat);
+                selectionRing.position.y = 0.01;
+                pawnGroup.add(selectionRing);
+
+                pawnGroup.userData = {
+                    isPawn: true,
+                    coinId: coinId,
+                    playerId: house.player,
+                    playerName: house.name,
+                    pawnIndex: pIdx,
+                    homeRow: house.row,
+                    homeCol: house.col,
+                    currentTile: tile,
+                    selectionRing: selectionRing,
+                    isMovable: false
+                };
+
+                tile.add(pawnGroup);
+                this.pawnMap.set(coinId, pawnGroup);
+            }
+
+            // Apply neat layout for initial 4 coins
+            this.layoutCoinsOnTile(tile);
+        });
+    }
+
+    // --- SLEEK BRASS THAMBOOLAM TRAY & 6 COWRIE SHELLS ---
+    build6ChozhiDice() {
+        this.chozhiGroup = new THREE.Group();
+
+        const trayRadius = 2.0;
+        const trayBaseGeo = new THREE.CylinderGeometry(trayRadius, trayRadius * 0.92, 0.28, 36);
+        const brassMat = new THREE.MeshStandardMaterial({
+            color: 0xd4af37,
+            roughness: 0.25,
+            metalness: 0.90
+        });
+        this.chozhiTrayMesh = new THREE.Mesh(trayBaseGeo, brassMat);
+        this.chozhiTrayMesh.position.y = 0.14;
+        this.chozhiTrayMesh.receiveShadow = true;
+        this.chozhiTrayMesh.castShadow = true;
+        this.chozhiGroup.add(this.chozhiTrayMesh);
+
+        const trayRimGeo = new THREE.TorusGeometry(trayRadius - 0.04, 0.09, 16, 40);
+        trayRimGeo.rotateX(Math.PI / 2);
+        const trayRim = new THREE.Mesh(trayRimGeo, brassMat);
+        trayRim.position.y = 0.28;
+        this.chozhiGroup.add(trayRim);
+
+        const velvetGeo = new THREE.CylinderGeometry(trayRadius - 0.14, trayRadius - 0.14, 0.05, 36);
+        const velvetMat = new THREE.MeshStandardMaterial({
+            color: 0x731a1a,
+            roughness: 0.95,
+            metalness: 0.02
+        });
+        const velvetMesh = new THREE.Mesh(velvetGeo, velvetMat);
+        velvetMesh.position.y = 0.27;
+        velvetMesh.receiveShadow = true;
+        this.chozhiGroup.add(velvetMesh);
+
+        const shellTextureCanvas = ProceduralTextures.createCompleteChozhiTexture(1024, 512);
+        const shellTex = new THREE.CanvasTexture(shellTextureCanvas);
+        shellTex.wrapS = THREE.ClampToEdgeWrapping;
+        shellTex.wrapT = THREE.ClampToEdgeWrapping;
+
+        const solidShellMaterial = new THREE.MeshStandardMaterial({
+            map: shellTex,
+            roughness: 0.14,
+            metalness: 0.04
+        });
+
+        const baseSphere = new THREE.SphereGeometry(0.44, 32, 24);
+        const posAttr = baseSphere.attributes.position;
+        const uvAttr = baseSphere.attributes.uv;
+
+        for (let i = 0; i < posAttr.count; i++) {
+            let px = posAttr.getX(i);
+            let py = posAttr.getY(i);
+            let pz = posAttr.getZ(i);
+
+            px *= 1.55;
+            pz *= 0.92;
+
+            const taper = Math.max(0.25, 1.0 - Math.pow(Math.abs(px) / 0.75, 2) * 0.42);
+            py *= taper;
+            pz *= taper;
+
+            if (py >= 0) {
+                const distFromCenterSlit = Math.abs(pz);
+                if (distFromCenterSlit < 0.16) {
+                    py = py * 0.22 - 0.04 * (1.0 - distFromCenterSlit / 0.16);
+                } else {
+                    py = py * 0.52;
+                }
+            } else {
+                py = py * 0.82;
+            }
+
+            posAttr.setXYZ(i, px, py, pz);
+
+            const u = (px / 1.55 + 0.46) / 0.92;
+            let v = 0.5;
+            if (py >= 0) {
+                v = 0.5 + Math.min(0.5, Math.abs(pz) / 0.46 * 0.5);
+            } else {
+                v = 0.5 - Math.min(0.5, Math.abs(py) / 0.46 * 0.5);
+            }
+            uvAttr.setXY(i, Math.max(0, Math.min(1, u)), Math.max(0, Math.min(1, v)));
+        }
+
+        baseSphere.computeVertexNormals();
+
+        this.chozhiShells = [];
+        const shellPositions = [
+            [-0.75, -0.50],
+            [0.0, -0.58],
+            [0.75, -0.50],
+            [-0.75, 0.50],
+            [0.0, 0.58],
+            [0.75, 0.50]
+        ];
+
+        for (let i = 0; i < 6; i++) {
+            const shellMesh = new THREE.Mesh(baseSphere.clone(), solidShellMaterial);
+            const [sx, sz] = shellPositions[i];
+
+            shellMesh.position.set(sx, 0.30, sz);
+            shellMesh.castShadow = true;
+            shellMesh.receiveShadow = true;
+
+            const isUpViewing = i < 3;
+            shellMesh.rotation.x = isUpViewing ? 0 : Math.PI;
+            shellMesh.rotation.y = (Math.random() - 0.5) * 0.4 + (i * Math.PI) / 3;
+
+            shellMesh.userData = {
+                index: i,
+                baseX: sx,
+                baseZ: sz,
+                baseY: 0.30,
+                isUpViewing: isUpViewing
+            };
+
+            this.chozhiGroup.add(shellMesh);
+            this.chozhiShells.push(shellMesh);
+        }
+
+        this.chozhiGroup.position.set(5.1, 0, 0);
+        this.scene.add(this.chozhiGroup);
+    }
+
+    // --- 3D PAWN HOPPING & ZERO-OVERLAP MOVEMENT ANIMATIONS ---
+
+    setMovableCoins(legalMoves) {
+        this.pawnMap.forEach(pawn => {
+            pawn.userData.isMovable = false;
+            pawn.userData.selectionRing.material.opacity = 0;
+        });
+
+        if (!legalMoves || legalMoves.length === 0) return;
+
+        legalMoves.forEach(move => {
+            const pawn = this.pawnMap.get(move.coin.id);
+            if (pawn) {
+                pawn.userData.isMovable = true;
+                pawn.userData.legalMove = move;
+                pawn.userData.selectionRing.material.opacity = 0.85;
+            }
+        });
+    }
+
+    // Smooth Multi-Step Parabolic 3D Hopping
+    animatePawnMovement(coinId, hopPath, capturedCoin, isGoal, onComplete) {
+        const pawn = this.pawnMap.get(coinId);
+        if (!pawn || hopPath.length === 0) {
             if (onComplete) onComplete();
-          });
-        } else {
-          this.isCoinAnimating = false;
-          if (onComplete) onComplete();
+            return;
         }
-        return;
-      }
 
-      const nextCoord = hopPath[currentHopIdx];
-      const nextTile = this.tiles[nextCoord.r][nextCoord.c];
+        this.isCoinAnimating = true;
+        this.setMovableCoins([]);
 
-      this.scene.attach(pawn);
+        const originTile = pawn.userData.currentTile;
+        let currentHopIdx = 0;
 
-      const startPos = pawn.position.clone();
-      const targetPos = new THREE.Vector3(
-        nextTile.position.x,
-        nextTile.position.y + 0.16,
-        nextTile.position.z,
-      );
+        const executeSingleHop = () => {
+            if (currentHopIdx >= hopPath.length) {
+                const finalCoord = hopPath[hopPath.length - 1];
+                const finalTile = this.tiles[finalCoord.r][finalCoord.c];
 
-      const hopDuration = 200; // ms
-      const startTime = performance.now();
+                // Reparent pawn to destination tile
+                finalTile.attach(pawn);
+                pawn.userData.currentTile = finalTile;
 
-      const hopStep = (now) => {
-        const elapsed = now - startTime;
-        const progress = Math.min(1.0, elapsed / hopDuration);
+                // Re-layout coins on both origin and final tiles to prevent ANY overlapping
+                this.layoutCoinsOnTile(originTile);
+                this.layoutCoinsOnTile(finalTile);
 
-        const ease =
-          progress < 0.5
-            ? 2 * progress * progress
-            : -1 + (4 - 2 * progress) * progress;
-        const hopArc = Math.sin(progress * Math.PI) * 0.45;
+                if (isGoal) {
+                    this.animateCrownedPawn(pawn);
+                }
 
-        pawn.position.x = THREE.MathUtils.lerp(startPos.x, targetPos.x, ease);
-        pawn.position.z = THREE.MathUtils.lerp(startPos.z, targetPos.z, ease);
-        pawn.position.y =
-          THREE.MathUtils.lerp(startPos.y, targetPos.y, ease) + hopArc;
+                if (capturedCoin) {
+                    this.animateCapturedPawn(capturedCoin.id, () => {
+                        this.layoutCoinsOnTile(finalTile);
+                        this.isCoinAnimating = false;
+                        if (onComplete) onComplete();
+                    });
+                } else {
+                    this.isCoinAnimating = false;
+                    if (onComplete) onComplete();
+                }
+                return;
+            }
 
-        if (progress < 1.0) {
-          requestAnimationFrame(hopStep);
-        } else {
-          pawn.position.copy(targetPos);
-          if (window.templeAudio) {
-            window.templeAudio.playStoneClack();
-          }
-          currentHopIdx++;
-          setTimeout(executeSingleHop, 18);
-        }
-      };
+            const nextCoord = hopPath[currentHopIdx];
+            const nextTile = this.tiles[nextCoord.r][nextCoord.c];
 
-      requestAnimationFrame(hopStep);
-    };
+            this.scene.attach(pawn);
 
-    executeSingleHop();
-  }
+            const startPos = pawn.position.clone();
+            const targetPos = new THREE.Vector3(
+                nextTile.position.x,
+                nextTile.position.y + 0.18,
+                nextTile.position.z
+            );
 
-  // Capture Return Arc Animation (Returns to empty resting slot)
-  animateCapturedPawn(capturedCoinId, onComplete) {
-    const pawn = this.pawnMap.get(capturedCoinId);
-    if (!pawn) {
-      if (onComplete) onComplete();
-      return;
+            const hopDuration = 240; // ms
+            const startTime = performance.now();
+
+            const hopStep = (now) => {
+                const elapsed = now - startTime;
+                const progress = Math.min(1.0, elapsed / hopDuration);
+
+                // Smooth easeInOut easing
+                const t = progress;
+                const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+                const hopArc = Math.sin(progress * Math.PI) * 0.45;
+                pawn.position.x = THREE.MathUtils.lerp(startPos.x, targetPos.x, ease);
+                pawn.position.z = THREE.MathUtils.lerp(startPos.z, targetPos.z, ease);
+                pawn.position.y = THREE.MathUtils.lerp(startPos.y, targetPos.y, ease) + hopArc;
+
+                if (progress < 1.0) {
+                    requestAnimationFrame(hopStep);
+                } else {
+                    pawn.position.copy(targetPos);
+                    if (window.templeAudio) {
+                        window.templeAudio.playStoneClack();
+                    }
+                    currentHopIdx++;
+                    setTimeout(executeSingleHop, 25);
+                }
+            };
+
+            requestAnimationFrame(hopStep);
+        };
+
+        executeSingleHop();
     }
 
-    if (window.templeAudio) {
-      window.templeAudio.playCaptureSound();
-    }
-
-    const yard = pawn.userData.homeYard;
-    const slotIdx = pawn.userData.slotIndex;
-    const slot = yard.userData.slots[slotIdx];
-
-    this.scene.attach(pawn);
-
-    const startPos = pawn.position.clone();
-    const targetPos = new THREE.Vector3(
-      yard.position.x + slot.x,
-      yard.position.y + yard.userData.baseY,
-      yard.position.z + slot.z,
-    );
-
-    const duration = 500; // ms
-    const startTime = performance.now();
-
-    const captureAnim = (now) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(1.0, elapsed / duration);
-      const arc = Math.sin(progress * Math.PI) * 1.5;
-
-      pawn.position.x = THREE.MathUtils.lerp(startPos.x, targetPos.x, progress);
-      pawn.position.z = THREE.MathUtils.lerp(startPos.z, targetPos.z, progress);
-      pawn.position.y =
-        THREE.MathUtils.lerp(startPos.y, targetPos.y, progress) + arc;
-      pawn.rotation.y += 0.25;
-
-      if (progress < 1.0) {
-        requestAnimationFrame(captureAnim);
-      } else {
-        yard.attach(pawn);
-        pawn.position.set(slot.x, yard.userData.baseY, slot.z);
-        pawn.userData.isInHomeYard = true;
-        pawn.userData.currentTile = null;
-        slot.isOccupied = true; // Re-occupy slot!
+    // Opponent Capture Return Animation
+    animateCapturedPawn(capturedCoinId, onComplete) {
+        const pawn = this.pawnMap.get(capturedCoinId);
+        if (!pawn) {
+            if (onComplete) onComplete();
+            return;
+        }
 
         if (window.templeAudio) {
-          window.templeAudio.playStoneClack();
+            window.templeAudio.playCaptureSound();
         }
-        if (onComplete) onComplete();
-      }
-    };
 
-    requestAnimationFrame(captureAnim);
-  }
+        const homeTile = this.tiles[pawn.userData.homeRow][pawn.userData.homeCol];
+        this.scene.attach(pawn);
 
-  animateCrownedPawn(pawn) {
-    pawn.scale.set(1.2, 1.2, 1.2);
-    if (window.templeAudio) {
-      window.templeAudio.playTempleBell(1.5);
-    }
-  }
+        const startPos = pawn.position.clone();
+        const targetPos = new THREE.Vector3(
+            homeTile.position.x,
+            homeTile.position.y + 0.18,
+            homeTile.position.z
+        );
 
-  resetAllPawns() {
-    this.pawnMap.forEach((pawn) => {
-      const yard = pawn.userData.homeYard;
-      const slotIdx = pawn.userData.slotIndex;
-      const slot = yard.userData.slots[slotIdx];
+        const duration = 550; // ms
+        const startTime = performance.now();
 
-      yard.attach(pawn);
-      pawn.position.set(slot.x, yard.userData.baseY, slot.z);
-      pawn.scale.set(1, 1, 1);
-      pawn.userData.selectionRing.material.opacity = 0;
-      pawn.userData.isMovable = false;
-      pawn.userData.isInHomeYard = true;
-      pawn.userData.currentTile = null;
-      slot.isOccupied = true;
-    });
+        const captureAnim = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(1.0, elapsed / duration);
+            const arc = Math.sin(progress * Math.PI) * 1.6;
 
-    const N = this.gridSize;
-    for (let r = 0; r < N; r++) {
-      for (let c = 0; c < N; c++) {
-        this.layoutCoinsOnTile(this.tiles[r][c]);
-      }
-    }
-  }
+            pawn.position.x = THREE.MathUtils.lerp(startPos.x, targetPos.x, progress);
+            pawn.position.z = THREE.MathUtils.lerp(startPos.z, targetPos.z, progress);
+            pawn.position.y = THREE.MathUtils.lerp(startPos.y, targetPos.y, progress) + arc;
+            pawn.rotation.y += 0.25;
 
-  // --- ROLL COWRIE SHELLS IN SIDE TRAY ---
-  rollChozhi() {
-    if (this.isRollingChozhi || this.isCoinAnimating) return;
-    this.isRollingChozhi = true;
+            if (progress < 1.0) {
+                requestAnimationFrame(captureAnim);
+            } else {
+                homeTile.attach(pawn);
+                pawn.userData.currentTile = homeTile;
+                this.layoutCoinsOnTile(homeTile);
+                if (window.templeAudio) {
+                    window.templeAudio.playStoneClack();
+                }
+                if (onComplete) onComplete();
+            }
+        };
 
-    if (window.templeAudio) {
-      window.templeAudio.playChozhiRattle();
+        requestAnimationFrame(captureAnim);
     }
 
-    const numShells = this.chozhiShells.length; // 4 or 6
-    let upCount = 0;
-    let points = 0;
-
-    if (numShells === 4) {
-      const rollDistribution = [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 0];
-      upCount =
-        rollDistribution[Math.floor(Math.random() * rollDistribution.length)];
-      points = upCount === 0 ? 8 : upCount;
-    } else {
-      const rollDistribution = [
-        1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4,
-        4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 0, 0,
-      ];
-      upCount =
-        rollDistribution[Math.floor(Math.random() * rollDistribution.length)];
-      points = upCount === 0 ? 12 : upCount;
-    }
-
-    const downCount = numShells - upCount;
-    const indices = [];
-    for (let k = 0; k < numShells; k++) indices.push(k);
-    indices.sort(() => Math.random() - 0.5);
-    const upIndices = new Set(indices.slice(0, upCount));
-
-    this.targetShellStates = [];
-    for (let i = 0; i < numShells; i++) {
-      const isUp = upIndices.has(i);
-      this.targetShellStates.push({
-        isUpViewing: isUp,
-        targetRotX: isUp ? 0 : Math.PI,
-        targetRotZ: (Math.random() - 0.5) * 0.1,
-        targetRotY: Math.random() * Math.PI * 2,
-        jitterX: (Math.random() - 0.5) * 0.18,
-        jitterZ: (Math.random() - 0.5) * 0.18,
-        spinSpeed: 7 + Math.random() * 5,
-      });
-    }
-
-    const rollDuration = 1.05;
-    const startTime = performance.now();
-
-    const rollAnim = (now) => {
-      const elapsed = (now - startTime) / 1000;
-      const progress = Math.min(1.0, elapsed / rollDuration);
-
-      this.chozhiShells.forEach((shell, i) => {
-        const target = this.targetShellStates[i];
-
-        if (progress < 0.6) {
-          const tossP = progress / 0.6;
-          const tossHeight = Math.sin(tossP * Math.PI) * 1.3;
-          shell.position.y = shell.userData.baseY + tossHeight;
-          shell.rotation.x += target.spinSpeed * 0.02;
-          shell.rotation.y += 0.14;
-          shell.rotation.z += 0.06;
-          shell.position.x =
-            shell.userData.baseX + Math.sin(tossP * 5 + i) * 0.08;
-          shell.position.z =
-            shell.userData.baseZ + Math.cos(tossP * 5 + i) * 0.08;
-        } else if (progress < 0.85) {
-          const bounceP = (progress - 0.6) / 0.25;
-          const bounceHeight =
-            Math.sin(bounceP * Math.PI) * 0.18 * (1 - bounceP);
-          shell.position.y = shell.userData.baseY + bounceHeight;
-
-          shell.position.x = THREE.MathUtils.lerp(
-            shell.position.x,
-            shell.userData.baseX + target.jitterX,
-            0.25,
-          );
-          shell.position.z = THREE.MathUtils.lerp(
-            shell.position.z,
-            shell.userData.baseZ + target.jitterZ,
-            0.25,
-          );
-
-          shell.rotation.x = THREE.MathUtils.lerp(
-            shell.rotation.x,
-            target.targetRotX,
-            0.3,
-          );
-          shell.rotation.z = THREE.MathUtils.lerp(
-            shell.rotation.z,
-            target.targetRotZ,
-            0.3,
-          );
-          shell.rotation.y = THREE.MathUtils.lerp(
-            shell.rotation.y,
-            target.targetRotY,
-            0.3,
-          );
-        } else {
-          const settleP = (progress - 0.85) / 0.15;
-          shell.position.y = shell.userData.baseY;
-          shell.position.x = THREE.MathUtils.lerp(
-            shell.position.x,
-            shell.userData.baseX + target.jitterX,
-            settleP,
-          );
-          shell.position.z = THREE.MathUtils.lerp(
-            shell.position.z,
-            shell.userData.baseZ + target.jitterZ,
-            settleP,
-          );
-
-          shell.rotation.x = THREE.MathUtils.lerp(
-            shell.rotation.x,
-            target.targetRotX,
-            settleP,
-          );
-          shell.rotation.z = THREE.MathUtils.lerp(
-            shell.rotation.z,
-            target.targetRotZ,
-            settleP,
-          );
-          shell.rotation.y = THREE.MathUtils.lerp(
-            shell.rotation.y,
-            target.targetRotY,
-            settleP,
-          );
+    animateCrownedPawn(pawn) {
+        pawn.scale.set(1.2, 1.2, 1.2);
+        if (window.templeAudio) {
+            window.templeAudio.playTempleBell(1.5);
         }
-      });
+    }
 
-      if (progress < 1.0) {
-        requestAnimationFrame(rollAnim);
-      } else {
-        this.isRollingChozhi = false;
-        this.chozhiShells.forEach((shell, i) => {
-          const target = this.targetShellStates[i];
-          shell.rotation.x = target.targetRotX;
-          shell.rotation.z = target.targetRotZ;
-          shell.rotation.y = target.targetRotY;
-          shell.position.y = shell.userData.baseY;
-          shell.userData.isUpViewing = target.isUpViewing;
+    resetAllPawns() {
+        this.pawnMap.forEach((pawn) => {
+            const homeTile = this.tiles[pawn.userData.homeRow][pawn.userData.homeCol];
+            homeTile.attach(pawn);
+            pawn.userData.currentTile = homeTile;
+            pawn.scale.set(1, 1, 1);
+            pawn.userData.selectionRing.material.opacity = 0;
+            pawn.userData.isMovable = false;
         });
 
-        const engine = window.chakaramEngine;
-        const isBonus = engine
-          ? engine.isBonusRoll(points)
-          : points === 1 ||
-            points === 4 ||
-            points === 8 ||
-            points === 6 ||
-            points === 12;
+        // Re-layout 4 starting safe house tiles
+        this.layoutCoinsOnTile(this.tiles[4][2]);
+        this.layoutCoinsOnTile(this.tiles[0][2]);
+        this.layoutCoinsOnTile(this.tiles[2][4]);
+        this.layoutCoinsOnTile(this.tiles[2][0]);
+    }
 
-        if (isBonus && window.templeAudio) {
-          window.templeAudio.playTempleBell(1.4);
+    // --- ROLL 6 CHOZHI ---
+    rollChozhi() {
+        if (this.isRollingChozhi || this.isCoinAnimating) return;
+        this.isRollingChozhi = true;
+
+        if (window.templeAudio) {
+            window.templeAudio.playChozhiRattle();
         }
 
-        if (this.onChozhiRolled) {
-          this.onChozhiRolled({
-            points: points,
-            upCount: upCount,
-            downCount: downCount,
-            numShells: numShells,
-            isDaayam: points === 1,
-            isChowka:
-              (numShells === 4 && points === 4) ||
-              (numShells === 6 && points === 6),
-            isAshta: numShells === 4 && points === 8,
-            isBaara: numShells === 6 && points === 12,
-            isBonus: isBonus,
-          });
+        const rollDistribution = [
+            1, 1, 1, 1, 1, 1,
+            2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+            3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+            4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+            5, 5, 5, 5, 5,
+            6, 6, 6,
+            0, 0, 0
+        ];
+
+        const upCount = rollDistribution[Math.floor(Math.random() * rollDistribution.length)];
+        const downCount = 6 - upCount;
+        const points = (upCount === 0) ? 12 : upCount;
+
+        const indices = [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5);
+        const upIndices = new Set(indices.slice(0, upCount));
+
+        this.targetShellStates = [];
+        for (let i = 0; i < 6; i++) {
+            const isUp = upIndices.has(i);
+            this.targetShellStates.push({
+                isUpViewing: isUp,
+                targetRotX: isUp ? 0 : Math.PI,
+                targetRotZ: (Math.random() - 0.5) * 0.1,
+                targetRotY: Math.random() * Math.PI * 2,
+                jitterX: (Math.random() - 0.5) * 0.22,
+                jitterZ: (Math.random() - 0.5) * 0.22,
+                spinSpeed: 7 + Math.random() * 5
+            });
         }
-      }
-    };
 
-    requestAnimationFrame(rollAnim);
-  }
+        const rollDuration = 1.25;
+        const startTime = performance.now();
 
-  setupLighting() {
-    this.ambientLight = new THREE.AmbientLight(0xfff6ec, 1.35);
-    this.scene.add(this.ambientLight);
+        const rollAnim = (now) => {
+            const elapsed = (now - startTime) / 1000;
+            const progress = Math.min(1.0, elapsed / rollDuration);
 
-    this.mainDirLight = new THREE.DirectionalLight(0xfffaee, 1.4);
-    this.mainDirLight.position.set(3, 20, 5);
-    this.mainDirLight.castShadow = true;
-    this.mainDirLight.shadow.mapSize.width = 2048;
-    this.mainDirLight.shadow.mapSize.height = 2048;
-    this.mainDirLight.shadow.bias = -0.0004;
-    this.scene.add(this.mainDirLight);
-  }
+            this.chozhiShells.forEach((shell, i) => {
+                const target = this.targetShellStates[i];
 
-  onMouseMove(event) {
-    const rect = this.renderer.domElement.getBoundingClientRect();
-    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                if (progress < 0.6) {
+                    const tossP = progress / 0.6;
+                    const tossHeight = Math.sin(tossP * Math.PI) * 1.5;
+                    shell.position.y = shell.userData.baseY + tossHeight;
+                    shell.rotation.x += target.spinSpeed * 0.02;
+                    shell.rotation.y += 0.14;
+                    shell.rotation.z += 0.06;
+                    shell.position.x = shell.userData.baseX + Math.sin(tossP * 5 + i) * 0.12;
+                    shell.position.z = shell.userData.baseZ + Math.cos(tossP * 5 + i) * 0.12;
+                } else if (progress < 0.85) {
+                    const bounceP = (progress - 0.6) / 0.25;
+                    const bounceHeight = Math.sin(bounceP * Math.PI) * 0.25 * (1 - bounceP);
+                    shell.position.y = shell.userData.baseY + bounceHeight;
+                    
+                    shell.position.x = THREE.MathUtils.lerp(shell.position.x, shell.userData.baseX + target.jitterX, 0.25);
+                    shell.position.z = THREE.MathUtils.lerp(shell.position.z, shell.userData.baseZ + target.jitterZ, 0.25);
 
-    this.raycaster.setFromCamera(this.mouse, this.camera);
+                    shell.rotation.x = THREE.MathUtils.lerp(shell.rotation.x, target.targetRotX, 0.3);
+                    shell.rotation.z = THREE.MathUtils.lerp(shell.rotation.z, target.targetRotZ, 0.3);
+                    shell.rotation.y = THREE.MathUtils.lerp(shell.rotation.y, target.targetRotY, 0.3);
+                } else {
+                    const settleP = (progress - 0.85) / 0.15;
+                    const ease = Math.min(1.0, settleP);
+                    
+                    shell.position.y = shell.userData.baseY;
+                    shell.position.x = THREE.MathUtils.lerp(shell.position.x, shell.userData.baseX + target.jitterX, ease);
+                    shell.position.z = THREE.MathUtils.lerp(shell.position.z, shell.userData.baseZ + target.jitterZ, ease);
 
-    const pawns = Array.from(this.pawnMap.values());
-    const intersects = this.raycaster.intersectObjects(pawns, true);
+                    shell.rotation.x = THREE.MathUtils.lerp(shell.rotation.x, target.targetRotX, ease);
+                    shell.rotation.z = THREE.MathUtils.lerp(shell.rotation.z, target.targetRotZ, ease);
+                    shell.rotation.y = THREE.MathUtils.lerp(shell.rotation.y, target.targetRotY, ease);
+                }
+            });
 
-    if (intersects.length > 0) {
-      let hitObj = intersects[0].object;
-      while (hitObj.parent && !hitObj.userData.isPawn) {
-        hitObj = hitObj.parent;
-      }
-      if (hitObj.userData.isPawn && hitObj.userData.isMovable) {
-        document.body.style.cursor = "pointer";
-        return;
-      }
+            if (progress < 1.0) {
+                requestAnimationFrame(rollAnim);
+            } else {
+                this.isRollingChozhi = false;
+                this.chozhiShells.forEach((shell, i) => {
+                    const target = this.targetShellStates[i];
+                    shell.rotation.x = target.targetRotX;
+                    shell.rotation.z = target.targetRotZ;
+                    shell.rotation.y = target.targetRotY;
+                    shell.position.y = shell.userData.baseY;
+                    shell.userData.isUpViewing = target.isUpViewing;
+                });
+
+                if (window.templeAudio) {
+                    if (points === 1 || points === 6 || points === 12) {
+                        window.templeAudio.playTempleBell(1.4);
+                    }
+                }
+
+                if (this.onChozhiRolled) {
+                    this.onChozhiRolled({
+                        points: points,
+                        upCount: upCount,
+                        downCount: downCount,
+                        isAllUp: upCount === 6,
+                        isAllDown: upCount === 0,
+                        isDaayam: points === 1,
+                        isTwelve: points === 12,
+                        isSix: points === 6
+                    });
+                }
+            }
+        };
+
+        requestAnimationFrame(rollAnim);
     }
 
-    // Check side tray hover
-    if (this.chozhiGroup) {
-      const chozhiIntersects = this.raycaster.intersectObjects(
-        this.chozhiGroup.children,
-        true,
-      );
-      if (chozhiIntersects.length > 0) {
-        document.body.style.cursor = "pointer";
-        return;
-      }
+    // --- TRADITIONAL BRASS KUTHUVILAKKU LAMPS ---
+    buildKuthuvilakkuLamps() {
+        const brassMat = new THREE.MeshStandardMaterial({
+            color: 0xd4af37,
+            roughness: 0.3,
+            metalness: 0.85
+        });
+
+        const lampPositions = [
+            [-5.2, -4.5],
+            [5.2, -4.5],
+            [-5.2, 4.5],
+            [5.2, 4.5]
+        ];
+
+        this.lamps = [];
+        this.flames = [];
+
+        lampPositions.forEach(([lx, lz]) => {
+            const lamp = new THREE.Group();
+
+            const baseGeo = new THREE.CylinderGeometry(0.55, 0.75, 0.35, 24);
+            const baseMesh = new THREE.Mesh(baseGeo, brassMat);
+            baseMesh.position.y = 0.175;
+            baseMesh.castShadow = true;
+            lamp.add(baseMesh);
+
+            const shaftGeo = new THREE.CylinderGeometry(0.12, 0.18, 2.4, 20);
+            const shaftMesh = new THREE.Mesh(shaftGeo, brassMat);
+            shaftMesh.position.y = 1.4;
+            shaftMesh.castShadow = true;
+            lamp.add(shaftMesh);
+
+            const nodeGeo = new THREE.SphereGeometry(0.26, 16, 16);
+            const nodeMesh = new THREE.Mesh(nodeGeo, brassMat);
+            nodeMesh.position.y = 1.7;
+            lamp.add(nodeMesh);
+
+            const bowlGeo = new THREE.CylinderGeometry(0.65, 0.35, 0.22, 24);
+            const bowlMesh = new THREE.Mesh(bowlGeo, brassMat);
+            bowlMesh.position.y = 2.6;
+            lamp.add(bowlMesh);
+
+            const finialGeo = new THREE.ConeGeometry(0.2, 0.6, 16);
+            const finialMesh = new THREE.Mesh(finialGeo, brassMat);
+            finialMesh.position.y = 3.0;
+            lamp.add(finialMesh);
+
+            const flameLight = new THREE.PointLight(0xff9933, 2.2, 14, 1.8);
+            flameLight.position.set(0, 2.85, 0);
+            flameLight.castShadow = true;
+            flameLight.shadow.bias = -0.002;
+            lamp.add(flameLight);
+
+            const flameGeo = new THREE.ConeGeometry(0.09, 0.28, 12);
+            const flameMat = new THREE.MeshBasicMaterial({
+                color: 0xffe082,
+                transparent: true,
+                opacity: 0.95
+            });
+            const flameMesh = new THREE.Mesh(flameGeo, flameMat);
+            flameMesh.position.set(0, 2.82, 0);
+            lamp.add(flameMesh);
+
+            lamp.position.set(lx, 0, lz);
+            this.scene.add(lamp);
+
+            this.lamps.push(lamp);
+            this.flames.push({
+                light: flameLight,
+                mesh: flameMesh,
+                baseIntensity: 2.2,
+                seed: Math.random() * 100
+            });
+        });
     }
 
-    document.body.style.cursor = "default";
-  }
+    setupLighting() {
+        this.ambientLight = new THREE.AmbientLight(0x2a221a, 1.0);
+        this.scene.add(this.ambientLight);
 
-  onPointerClick(event) {
-    if (this.isCoinAnimating) return;
+        this.mainDirLight = new THREE.DirectionalLight(0xfff0d6, 1.2);
+        this.mainDirLight.position.set(6, 16, 8);
+        this.mainDirLight.castShadow = true;
+        this.mainDirLight.shadow.mapSize.width = 2048;
+        this.mainDirLight.shadow.mapSize.height = 2048;
+        this.mainDirLight.shadow.bias = -0.0005;
+        this.scene.add(this.mainDirLight);
 
-    const rect = this.renderer.domElement.getBoundingClientRect();
-    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        this.centerSpot = new THREE.SpotLight(0xffd700, 1.4);
+        this.centerSpot.position.set(0, 9, 0);
+        this.centerSpot.angle = Math.PI / 4.8;
+        this.centerSpot.penumbra = 0.5;
+        this.centerSpot.decay = 1.4;
+        this.centerSpot.distance = 18;
+        this.centerSpot.target = this.boardGroup;
+        this.scene.add(this.centerSpot);
+    }
 
-    this.raycaster.setFromCamera(this.mouse, this.camera);
+    onMouseMove(event) {
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-    // 1. Chozhi Tray Click -> Roll
-    if (this.chozhiGroup) {
-      const chozhiIntersects = this.raycaster.intersectObjects(
-        this.chozhiGroup.children,
-        true,
-      );
-      if (chozhiIntersects.length > 0) {
-        const engine = window.chakaramEngine;
-        if (engine && !engine.hasRolled && !engine.getCurrentPlayer().isAI) {
-          this.rollChozhi();
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const flatTiles = this.tiles.flat();
+        const intersects = this.raycaster.intersectObjects(flatTiles, true);
+
+        if (intersects.length > 0) {
+            let hitObj = intersects[0].object;
+            while (hitObj.parent && hitObj.parent !== this.boardGroup && !hitObj.userData.index && !hitObj.userData.isPawn) {
+                hitObj = hitObj.parent;
+            }
+
+            if (hitObj.userData.isPawn && hitObj.userData.isMovable) {
+                document.body.style.cursor = 'pointer';
+            } else if (hitObj.userData.index && this.hoveredCell !== hitObj) {
+                this.hoveredCell = hitObj;
+                document.body.style.cursor = 'pointer';
+                if (this.onCellHovered) {
+                    this.onCellHovered(hitObj.userData);
+                }
+            }
+        } else {
+            const chozhiIntersects = this.raycaster.intersectObjects(this.chozhiGroup.children, true);
+            if (chozhiIntersects.length > 0) {
+                document.body.style.cursor = 'pointer';
+            } else {
+                if (this.hoveredCell) {
+                    this.hoveredCell = null;
+                    document.body.style.cursor = 'default';
+                    if (this.onCellHovered) {
+                        this.onCellHovered(null);
+                    }
+                } else {
+                    document.body.style.cursor = 'default';
+                }
+            }
         }
-        return;
-      }
     }
 
-    // 2. Movable Pawn Click -> Execute Move!
-    const pawns = Array.from(this.pawnMap.values());
-    const intersects = this.raycaster.intersectObjects(pawns, true);
+    onPointerClick(event) {
+        if (this.isCoinAnimating) return;
 
-    if (intersects.length > 0) {
-      let hitObj = intersects[0].object;
-      while (hitObj.parent && !hitObj.userData.isPawn) {
-        hitObj = hitObj.parent;
-      }
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-      if (
-        hitObj.userData.isPawn &&
-        hitObj.userData.isMovable &&
-        this.onPawnClicked
-      ) {
-        this.onPawnClicked(hitObj.userData.coinId, hitObj.userData.legalMove);
-        return;
-      }
-    }
-  }
+        this.raycaster.setFromCamera(this.mouse, this.camera);
 
-  onResize() {
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(width, height);
-  }
+        // 1. Check Chozhi Tray Click -> Roll (if allowed by engine)
+        const chozhiIntersects = this.raycaster.intersectObjects(this.chozhiGroup.children, true);
+        if (chozhiIntersects.length > 0) {
+            const engine = window.chakaramEngine;
+            if (engine && !engine.hasRolled && !engine.getCurrentPlayer().isAI) {
+                this.rollChozhi();
+            }
+            return;
+        }
 
-  animate(time) {
-    requestAnimationFrame(this.animate);
-    const sec = time * 0.001;
+        // 2. Check Movable Pawn Click -> Execute Move!
+        const flatTiles = this.tiles.flat();
+        const intersects = this.raycaster.intersectObjects(flatTiles, true);
 
-    this.pawnMap.forEach((pawn) => {
-      if (pawn.userData.isMovable) {
-        const ring = pawn.userData.selectionRing;
-        const pulse = (Math.sin(sec * 6) + 1) * 0.5;
-        ring.material.opacity = 0.5 + pulse * 0.45;
-        ring.scale.set(1 + pulse * 0.18, 1 + pulse * 0.18, 1);
-      }
-    });
+        if (intersects.length > 0) {
+            let hitObj = intersects[0].object;
+            while (hitObj.parent && !hitObj.userData.isPawn && !hitObj.userData.index) {
+                hitObj = hitObj.parent;
+            }
 
-    if (this.controls) {
-      this.controls.update();
+            if (hitObj.userData.isPawn) {
+                if (hitObj.userData.isMovable && this.onPawnClicked) {
+                    this.onPawnClicked(hitObj.userData.coinId, hitObj.userData.legalMove);
+                    return;
+                }
+            }
+
+            if (hitObj.userData.index) {
+                this.selectCell(hitObj.userData.row, hitObj.userData.col);
+            }
+        }
     }
 
-    this.renderer.render(this.scene, this.camera);
-  }
+    selectCell(row, col) {
+        if (this.selectedCell) {
+            this.updateTileTexture(this.selectedCell.row, this.selectedCell.col, false);
+        }
+
+        this.selectedCell = { row, col };
+        this.updateTileTexture(row, col, true);
+
+        if (window.templeAudio) {
+            window.templeAudio.playStoneClack();
+            if (row === 2 && col === 2) {
+                window.templeAudio.playTempleBell(1.2);
+            }
+        }
+
+        if (this.onCellSelected) {
+            const mesh = this.tiles[row][col];
+            this.onCellSelected(mesh.userData);
+        }
+    }
+
+    updateTileTexture(row, col, isSelected) {
+        const mesh = this.tiles[row][col];
+        const newCanvas = ProceduralTextures.createTileTexture(row, col, isSelected, this.currentTheme);
+        const newTex = new THREE.CanvasTexture(newCanvas);
+        mesh.material[2].map = newTex;
+        mesh.material[2].needsUpdate = true;
+    }
+
+    setTheme(themeName) {
+        this.currentTheme = themeName;
+        for (let r = 0; r < 5; r++) {
+            for (let c = 0; c < 5; c++) {
+                const isSel = this.selectedCell && this.selectedCell.row === r && this.selectedCell.col === c;
+                this.updateTileTexture(r, c, isSel);
+            }
+        }
+        if (window.templeAudio) {
+            window.templeAudio.playStoneClack();
+        }
+    }
+
+    setAtmosphere(mode) {
+        this.currentAtmosphere = mode;
+        if (mode === 'night') {
+            this.scene.background.setHex(0x0a0908);
+            this.scene.fog.color.setHex(0x0a0908);
+            this.ambientLight.color.setHex(0x2a221a);
+            this.ambientLight.intensity = 1.0;
+            this.mainDirLight.color.setHex(0xfff0d6);
+            this.mainDirLight.intensity = 1.2;
+            this.centerSpot.intensity = 1.4;
+        } else if (mode === 'dawn') {
+            this.scene.background.setHex(0x1a120b);
+            this.scene.fog.color.setHex(0x1a120b);
+            this.ambientLight.color.setHex(0x5c4228);
+            this.ambientLight.intensity = 1.4;
+            this.mainDirLight.color.setHex(0xffb86c);
+            this.mainDirLight.intensity = 2.0;
+            this.centerSpot.intensity = 1.6;
+        } else if (mode === 'golden') {
+            this.scene.background.setHex(0x261409);
+            this.scene.fog.color.setHex(0x261409);
+            this.ambientLight.color.setHex(0x733d18);
+            this.ambientLight.intensity = 1.6;
+            this.mainDirLight.color.setHex(0xffaa44);
+            this.mainDirLight.intensity = 2.4;
+            this.centerSpot.intensity = 1.8;
+        }
+    }
+
+    setCameraPreset(preset) {
+        if (!this.controls) return;
+
+        const duration = 1.2;
+        let targetPos = { x: -5.5, y: 7.8, z: 9.2 };
+        let targetLook = { x: 0.5, y: 0.5, z: 0 };
+
+        if (preset === 'cinematic') {
+            targetPos = { x: -5.5, y: 7.8, z: 9.2 };
+            targetLook = { x: 0.5, y: 0.5, z: 0 };
+        } else if (preset === 'topdown') {
+            targetPos = { x: 0, y: 14.5, z: 0.01 };
+            targetLook = { x: 0, y: 0.5, z: 0 };
+        } else if (preset === 'chozhi') {
+            targetPos = { x: 5.1, y: 3.5, z: 3.2 };
+            targetLook = { x: 5.1, y: 0.3, z: 0 };
+        }
+
+        const startPos = this.camera.position.clone();
+        const startLook = this.controls.target.clone();
+        const startTime = performance.now();
+
+        const anim = (now) => {
+            const elapsed = (now - startTime) / (duration * 1000);
+            const t = Math.min(1, Math.max(0, elapsed));
+            const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+            this.camera.position.set(
+                startPos.x + (targetPos.x - startPos.x) * ease,
+                startPos.y + (targetPos.y - startPos.y) * ease,
+                startPos.z + (targetPos.z - startPos.z) * ease
+            );
+            this.controls.target.set(
+                startLook.x + (targetLook.x - startLook.x) * ease,
+                startLook.y + (targetLook.y - startLook.y) * ease,
+                startLook.z + (targetLook.z - startLook.z) * ease
+            );
+
+            if (t < 1) {
+                requestAnimationFrame(anim);
+            }
+        };
+        requestAnimationFrame(anim);
+    }
+
+    onResize() {
+        const width = this.container.clientWidth;
+        const height = this.container.clientHeight;
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(width, height);
+    }
+
+    animate(time) {
+        requestAnimationFrame(this.animate);
+
+        const sec = time * 0.001;
+
+        this.flames.forEach((flame) => {
+            const flicker = Math.sin(sec * 18 + flame.seed) * 0.16 + Math.cos(sec * 27 + flame.seed) * 0.12;
+            flame.light.intensity = flame.baseIntensity + flicker;
+            flame.mesh.scale.set(
+                1 + flicker * 0.4,
+                1 + flicker * 0.8,
+                1 + flicker * 0.4
+            );
+        });
+
+        for (let r = 0; r < 5; r++) {
+            for (let c = 0; c < 5; c++) {
+                const tile = this.tiles[r][c];
+                const isSel = this.selectedCell && this.selectedCell.row === r && this.selectedCell.col === c;
+                const isHov = this.hoveredCell === tile;
+
+                let targetY = tile.userData.baseY;
+                if (isSel) {
+                    targetY += 0.28;
+                } else if (isHov) {
+                    targetY += 0.12;
+                }
+
+                tile.position.y += (targetY - tile.position.y) * 0.2;
+            }
+        }
+
+        this.pawnMap.forEach(pawn => {
+            if (pawn.userData.isMovable) {
+                const ring = pawn.userData.selectionRing;
+                const pulse = (Math.sin(sec * 6) + 1) * 0.5;
+                ring.material.opacity = 0.5 + pulse * 0.45;
+                ring.scale.set(1 + pulse * 0.2, 1 + pulse * 0.2, 1);
+            }
+        });
+
+        if (this.controls) {
+            this.controls.update();
+        }
+
+        this.renderer.render(this.scene, this.camera);
+    }
 }
 
 window.Chakaram3DScene = Chakaram3DScene;
